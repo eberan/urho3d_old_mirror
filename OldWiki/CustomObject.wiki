@@ -1,0 +1,3 @@
+A [SceneNode scene node], derived from [GeometryNode], that allows the user to define its visible geometry by defining batches of raw vertex and index data. The geometry is completely static, and it does not support geometry LOD transitions.
+
+If several batches are defined to use the same material, they can optionally be combined into one for optimized rendering.

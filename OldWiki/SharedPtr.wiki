@@ -1,0 +1,3 @@
+A template pointer class for automatic object lifetime management. To use, the target object must derive from the class RefCounted. The advantage of intrusive reference counting is that conversions can be safely performed between raw, shared and weak pointers.
+
+There is one situation you have to watch out for: if there is only one SharedPtr reference to an object remaining, it is converted to a raw pointer, and then that final SharedPtr goes out of scope, the target object would get deleted, and the raw pointer would now point to freed memory, yielding undefined behaviour when used.

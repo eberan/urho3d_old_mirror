@@ -1,0 +1,27 @@
+Tool that loads various 3D formats supported by [http://assimp.sourceforge.net/ Open Asset Import Library] and saves Urho3D model, animation, material and scene files out of them. For the list of supported formats, look [http://assimp.sourceforge.net/main_features_formats.html here].
+
+Usage:
+
+{{{
+AssetImporter <command> <input file> <output file> [options]
+
+Commands:
+model     Export a model and animations
+scene     Export a scene and its models
+dumpnodes Dump scene node structure. No output file is generated
+lod       Combine several Urho3D models as LOD levels of the output model
+          Syntax: lod <dist0> <mdl0> <dist1> <mdl1> ... <output file>
+
+Options:
+-b        Save scene in binary format, default format is XML
+-i        Use local IDs for scene entities
+-lcX      Use LOD level X for collision mesh, default is middle LOD
+-lrX      Use LOD level X for raycast, default is same as visible
+-loX      Use LOD level X for occlusion, default is same as visible
+-na       Do not export animations
+-ne       Do not create Octree & PhysicsWorld extensions to the scene
+-nm       Do not export materials
+-pX       Use base path X for resources in the scene file
+-rX       Use scene node X as root node
+-t        Generate tangents to model(s)
+}}}

@@ -1,0 +1,1 @@
+Exceptions are used sparingly in Urho3D. Mostly, they are used during resource loading and GPU object creation, to simplify the handling of error cases. Missing XML elements or attributes will also by default throw an exception.

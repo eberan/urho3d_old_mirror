@@ -1,0 +1,25 @@
+Urho3D uses [http://www.cmake.org cmake] to build. The build process has two steps:
+
+1) Run cmake in the root directory with your preferred toolchain specified to generate the build files. Visual Studio 2008/2010 and MinGW have been tested. You can use the batch files provided (cmake_vs2008.bat, cmake_vs2010.bat and cmake_gcc.bat.)
+
+2) For Visual Studio, open Urho3D.sln and build the configuration(s) you like. For MinGW, execute make (by default, cmake_gcc.bat specifies to make a Release build.)
+
+The build process will also compile models and shaders from the SourceAssets directory into Bin/Data/Models & Bin/Data/Shaders. Shader compilation requires fxc.exe (from the DirectX SDK) to be available through the system PATH. Note that the debug executables of tools will not have the `_`d postfix, to allow the asset build scripts to work in both debug & release builds.
+
+After the build is complete, the examples can be run from the Bin directory.
+
+To run for example NinjaSnowWar from the Visual Studio debugger, set it as a startup project and enter its relative path and filename into Debugging -> Command: ..\..\Bin\NinjaSnowWar.exe or ..\..\Bin\NinjaSnowWar_d.exe Additionally, entering -w into Debugging -> Command Arguments is highly recommended. This enables startup in windowed mode: without it running into an exception or breakpoint will be obnoxious as the mouse cursor will most probably be hidden.
+
+===Generating Doxygen documentation===
+
+Urho3D classes have been sparsely documented using [http://www.doxygen.org Doxygen] notation. To generate documentation into the "Docs" subdirectory, open the Doxyfile in the root directory with doxywizard and click "Run doxygen" from the "Run" tab.
+
+===Improving the build time===
+
+Under Visual Studio, the release build enables link-time code generation to maximize optimization opportunities. LTCG can make the link phase noticeably slower, so the relwithdebinfo build may be preferable for development.
+
+Modifications in some of the libraries can cause the tools to rebuild, which in turn causes a rebuild of the assets. The compilation of shaders is especially slow, so it can be helpful to remove the Shaders project from the solution when not making modifications to them.
+
+===Troubleshooting===
+
+Some SM2.0 shaders in Urho3D reach exactly the arithmetic instruction count limit. The fxc.exe in newer DirectX SDK's may fail to compile them. At least the March 2009 SDK is known to work.

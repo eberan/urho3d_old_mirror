@@ -1,0 +1,1 @@
+A sound channel component in the [Audio] subsystem that allows playback of stereo panned sounds.

@@ -1,0 +1,23 @@
+Urho3D utilizes an [http://cowboyprogramming.com/2007/01/05/evolve-your-heirachy/ entity-component] based scene model.
+
+This means that you create a Scene, then create entities inside it (each individual game object, such as the ninja in NinjaSnowWar, would be a separate entity) and then populate the entities using components.
+
+The entity itself is "dumb" and provides just the facility to store components, as well as freeform properties inside a VariantMap, while all the interesting functionality is handled by the components.
+
+Most components in Urho3D are also [SceneNode scene nodes] to allow for hierarchical spatial composition. This does not relate to just rendering and physics: a sound in 3D space has a position as well.
+
+For an example, the ninja in NinjaSnowWar consists of the following components:
+
+  * RigidBody - the physics object for motion & collision.
+  * AnimatedModel - the skeletally animated 3D model. Parented to the RigidBody.
+  * AnimationController - drives the model's animations and fading them in & out automatically.
+  * Ninja - the game logic component, derived from GameObject. Acts on the RigidBody, AnimatedModel & AnimationController to implement motion and animation, spawns projectiles, and takes damage.
+  * (PositionalChannel) - any active sound that the entity is playing, such as throw or death sound. These components are only added when needed.
+
+Creating components is most convenient through a ComponentFactory, that creates a component when given a component type ID. The factory can then be registered to the Scene.
+
+When created through the [Engine], the scene will already have component factories registered for the common subsystems, like [Rendering Renderer] and [Audio]. It also has "extensions": an [Octree] for accelerating rendering queries, and a [Physics physics world] if created with physics enabled. 
+
+Note that in contrast to the [Octree], the Scene owns its entities, and an entity owns its components. Object lifetime and validity of references is handled through shared pointers.
+
+Also note that the Urho3D scene has nothing to do with a scene graph, it's just a flat list of entities. In fact a conventional scene graph does not exist at all in Urho3D; you decide when to parent scene nodes to other nodes, if at all.

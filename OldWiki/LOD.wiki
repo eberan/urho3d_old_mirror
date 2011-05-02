@@ -1,0 +1,12 @@
+Urho3D supports the following level of detail techniques:
+
+  * Geometry LOD - if available, use a less detailed version of the model with increasing distance
+  * Material LOD - if available, use less detailed [Material material] techniques with increasing distance
+  * Animation LOD - update animation less frequently with increasing distance
+
+Furthermore, the following optimizations can also be thought of as a kind of LOD:
+
+  * Draw distance: if nonzero, skip rendering a geometry or light if it's far away enough
+  * Shadow distance: if nonzero, stop rendering shadows when the geometry or light is far away enough
+
+In addition, lights can be made to smoothly fade out with distance.

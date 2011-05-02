@@ -1,0 +1,43 @@
+Texture formats supported by Urho3D are:
+
+  * *jpg*, *png*, *gif*, *tga* and *bmp* images through the [http://nothings.org stb_image] library. These will be stored uncompressed into the video memory, and mipmaps will be generated manually as necessary.
+  * *dds* compressed images (only DXT1, DXT3 and DXT5 surface formats.) These will be stored into the video memory as-is, including any mipmaps.
+
+===Texture parameters===
+
+In addition to the texture image file, parameters for the texture can be specified through an optional XML file that has the same name as the image, but .xml extension. Possible elements and attributes are described below:
+
+{{{
+<texture>
+    <address coord="u|v" mode="wrap|mirror|clamp|border" />
+    <border color="r g b a" />
+    <filter mode="nearest|bilinear|trilinear|anisotropic" />
+    <mipmap enable="true|false" />
+    <quality low="x" medium="x" high="x" />
+</texture>
+}}}
+
+The quality element describes how many mipmaps to skip on low, medium and high texture quality settings respectively. The default values are 2, 1, and 0. Values can be omitted freely; defaults will be used in that case. A higher quality setting will never skip more mipmaps than a lower quality setting, therefore writing {{{<quality low="0" />}}} disables the quality reduction altogether.
+
+Note: for light attenuation and spot light textures, as well as UI images, it's wise to disable both mipmapping and quality reduction.
+
+===Cube maps===
+
+Cube map textures are described by an XML file that specifies the texture image for each of the 6 faces. For example:
+
+{{{
+<cubemap>
+    <face name="Positive_X.dds" />
+    <face name="Negative_X.dds" />
+    <face name="Positive_Y.dds" />
+    <face name="Negative_Y.dds" />
+    <face name="Positive_Z.dds" />
+    <face name="Negative_Z.dds" />
+</cubemap>
+}}}
+
+Then, to load the cube map texture, one must point at the XML file while requesting a [Resources resource] of type TextureCube. For example:
+
+{{{
+TextureCube* cube = mCache->getResource<TextureCube>("Textures/Skybox.xml");
+}}}

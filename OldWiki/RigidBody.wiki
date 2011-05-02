@@ -1,0 +1,1 @@
+A physics [SceneNode scene node] that is either static, kinematic (fully under application control) or dynamic (reacts to forces.) Can have a [CollisionShape] to generate collisions with the rest of the [Physics physics world.]

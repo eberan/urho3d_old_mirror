@@ -1,0 +1,16 @@
+Urho3D uses the following conventions:
+
+  * Left-handed coordinates. Positive axes point to the right, up, and forward, and positive rotation is clockwise.
+
+  * Degrees are used for angles.
+
+  * Clockwise vertices define a front face.
+
+  * Audio volume is specified from 0.0 (silence) to 1.0 (full volume)
+
+  * Axis aligned bounding boxes are used in all bounding tests, except for raycast into bone collision boxes, and testing whether a [Camera] is inside a [Zone]; in those cases oriented bounding boxes are used instead.
+
+  * Path names use slash instead of backslash. Paths will be converted internally into the necessary format when calling into the operating system.
+  
+  * Raw pointers are used whenever possible in the public API. This simplifies exposing functions & classes to script, and is relatively safe, because SharedPtr & WeakPtr use intrusive reference counting.
+

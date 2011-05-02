@@ -1,0 +1,32 @@
+ParticleEmitter derives from BillboardSet to implement a particle system that updates automatically. Defined in the [Engine] library.
+
+The particle system's properties can be set through a XML description file.
+
+Most of the parameters can take either a single value, or minimum and maximum values to allow for random variation. Where available, the example below demonstrates setting both the minimum and maximum:
+
+{{{
+<particleemitter>
+    <material name="ParticleMaterial.xml" />
+    <sorting enable="true|false" />
+    <updateinvisible enable="true|false" />
+    <relative enable="true|false" />
+    <emittertype value="point|box|sphere" />
+    <emittersize value="x y z" />
+    <direction min="x1 y1 z1" max="x2 y2 z2" />
+    <constantforce value="x y z" />
+    <dampingforce value="x" />
+    <activetime value="t" />
+    <inactivetime value="t" />
+    <interval min="t1" max="t2" />
+    <particlesize min="x1 y1" max="x2 y2" />
+    <timetolive min="t1" max="t2" />
+    <velocity min="x1" max="x2" />
+    <rotation min="x1" max="x2" />
+    <rotationspeed min="x1" max="x2" /> 
+    <sizedelta add="x" mul="y" />
+    <color value="r g b a" />
+    <colorfade color="r g b a" time="t" />  
+</particleemitter>
+}}}
+
+Note: zero active or inactive time period means infinite. Instead of defining a single color element, several colorfade elements can be defined in time order to describe how the particles change color over time.

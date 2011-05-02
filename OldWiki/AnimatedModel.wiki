@@ -1,0 +1,31 @@
+A [SceneNode scene node] that derives from [StaticModel] and implements skeletal and vertex morph animation on top of it.
+
+To use skeletal animations, you need to add one or several [AnimationState AnimationStates] to the model, and use those to control the animation. The animation [Resources resource] to use is specified on creation.
+
+Example of adding an AnimationState, then setting it to full weight, and enabling looped playback:
+
+{{{
+AnimationState* anim = model->addAnimationState(mCache->getResource<Animation>("Models/Jack_Walk.ani"));
+anim->setLooped(true);
+anim->setWeight(1.0f);
+}}}
+
+Incrementing the time position inside an update function to actually make the animation play:
+
+{{{
+AnimationState* anim = model->getAnimationState("Walk");
+if (anim)
+    anim->addTime(timeStep);
+}}}
+
+getAnimationState() supports using either the full resource name or just the animation name stored inside the animation resource. In the example above, the latter is being used.
+
+===Invisible updates===
+
+By default AnimatedModel does not update the animation when not visible. This may have some side effects, for example if the model has a skeletally attached child model, and only the child model is visible, the animation would not update. Also a raycast to an invisible AnimatedModel would not report correct bone collisions, as their positions would not have been updated. For these reasons, it is possible to enable invisible animation updates by calling setInvisibleLodFactor() with a value greater than 0. To conserve CPU time, the factor value allows to adjust the LOD distance for the invisible update. For example the value 2 would apply animation LOD as if the model was 2x further away than it actually is.
+
+When the scene is run in headless mode, all AnimatedModels will always update, as there is no concept of visibility.
+
+===Limitations===
+
+Urho3D does not implement software skinning at all. Therefore the amount of bones per model subgeometry (batch) is limited by available vertex shader constants, and currently the maximum is 64. If you try to define more, you'll get an error from the model conversion tools.

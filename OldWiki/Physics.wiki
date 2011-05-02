@@ -1,0 +1,31 @@
+The physics library in Urho3D implements rigid body physics, using [http://www.ode.org Open Dynamics Engine]. It provides a physics world, a rigid body [SceneNode scene node], a [CollisionShape collision shape] resource, and [Joint joints] between bodies.
+
+A physics world is optionally created for each [Scene]. By default the world updates at 60Hz frequency, but the motion is interpolated so that it appears smooth also when the rendering framerate is higher than that. The update frequency can be changed with the setFps() function.
+
+Rigid body scene nodes are assumed to be relative to the world space, ie. they should never be parented to another scene node, or otherwise they will not show up in the 3D scene correctly.
+
+The physics world sends 3 types of events during its update step:
+
+  * EVENT_PHYSICSPRESTEP before the simulation is stepped.
+  * EVENT_PHYSICSCOLLISION (and EVENT_ENTITYCOLLISION to the participating entities) for each collision during the simulation step.
+  * EVENT_PHYSICSPOSTSTEP after the simulation has been stepped.
+
+Note that if the rendering framerate is high, the physics might not be stepped at all on each frame: in that case those events will not be sent.
+
+The physics step events can be used for fixed timestep component logic updates.
+
+===Networked physics===
+
+When [Network networking] is being used, the server performs authoritative physics simulation, and sends constant physics state updates (position, rotation, linear and angular velocities) for active rigid bodies.
+
+The clients will snap to the received state, then continue to extrapolate forward from it. Additional smoothing is performed on the rigid bodies' rendering transforms to hide possible jitter and loss in packet reception.
+
+There are 3 ways to sync physics motion, from least to most expensive:
+
+  * Set the rigid body to not replicate at all over the network. In this case, any visible components parented to it will still appear to move. Utilized network bandwidth is minimal, because only position and rotation are sent, not velocities. However, now the client can not extrapolate at all, so in case of packet loss the object stops as soon as the visual smoothing has finished.
+
+  * Allow the rigid body to replicate, which happens by default. The extrapolation described above will be performed. Any motion will be subject to network latency.
+
+  * Activate client-side prediction both on the rigid body, and on the entity that contains it. Now the client will not simply snap to the latest server state, but extrapolate immediately forward by as large timestep as the current network latency is. This is expensive in terms of CPU usage, so it is best used sparingly, like for player controlled characters.
+
+Note that client-side prediction is far from perfect, as any deviations that the client can not foresee (such as another player or AI character blocking the path) will cause misprediction and a noticeable snap once the server sends the next update.

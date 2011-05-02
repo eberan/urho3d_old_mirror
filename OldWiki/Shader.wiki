@@ -1,0 +1,81 @@
+In Urho3D, shaders are written in HLSL. Accompanying them is always an XML description file that specifies the shader permutations to compile. The HLSL code and the description file are fed to ShaderCompiler, which then compiles each permutation as an offline process. No shader compilation happens during runtime.
+
+The description file revolves around the concept of describing shader *variations* and *options*, each of them with a matching preprocessor define (or several). 
+
+The difference between variations and options:
+
+  * If variations are specified for a shader, one of them will always be active in the permutations. 
+  * An option can be either on or off, independent of other options unless specified otherwise.
+
+The variations and options can *include* or *exclude* other options. For example, it makes sense for a specular mapping option to include the actual specular lighting calculation!
+
+They can also *require* other preprocessor defines. This is how Shader Model 3.0-exclusive options are described: when compiling for 3.0 instead of 2.0, the define "SM3" will be present.
+
+When compiling the permutations, the active variations and options will be appended to the base shader filename in the order they are defined in the description. For example if "Diff", "Normal" and "Spec" options exist for a shader called "ForwardSimple", and they do not depend on each other, the following shaders would be generated:
+
+{{{
+ForwardSimple
+ForwardSimple_Diff
+ForwardSimple_Normal
+ForwardSimple_DiffNormal
+ForwardSimple_Spec
+ForwardSimple_DiffSpec
+ForwardSimple_NormalSpec
+ForwardSimple_DiffNormalSpec
+}}}
+
+===Hardcoded shader permutations===
+
+For the most part, a [Material material] is free to specify the vertex and pixel shaders it wants to use. But to simplify the use of different geometry types and lighting, the following hardcoded permutations are assumed to exist. If a certain combination is not found, it is not a fatal error, instead the material will just render nothing.
+
+Vertex shader:
+
+{{{
+(empty)
+Spot
+Shadow
+SpotShadow
+Skinned
+SpotSkinned
+ShadowSkinned
+SpotShadowSkinned
+Instanced
+SpotInstanced
+ShadowInstanced
+SpotShadowInstanced
+}}}
+
+Pixel shader:
+
+{{{
+Dir
+DirSpec
+DirShadow
+DirShadowSpec
+DirNegative
+Point
+PointSpec
+PointShadow
+PointShadowSpec
+PointNegative
+Spot
+SpotSpec
+SpotShadow
+SpotShadowSpec
+SpotNegative
+}}}
+
+Additionally, shadow mapping needs either manual (ATI depth textures) or automatic (NVIDIA-style hardware shadow maps) depth compare, and this multiplies the amount of shadowed pixel shader permutations by two:
+
+{{{
+(empty)
+HW
+}}}
+
+If a material is transparent, shadows are not supported, and this reduces the needed shader permutations to only the unshadowed ones.
+
+===Shader constant parameters===
+
+Vertex and pixel shader constant registers used by each parameter are explicitly allocated in the file Common.hlsl. The same parameter will therefore always go into the same register. The output of ShaderCompiler tells the register allocations to the rendering code, so that the allocation information does not need to be duplicated anywhere else. The parameters still need to be explicitly enumerated in code, and mappings between the enumerations and textual parameter names have to be defined. See ShaderDefs.h, VertexShader.cpp and PixelShader.cpp.
+
+See also Batch.cpp for code that sets most of the shader parameters in preparation to rendering.

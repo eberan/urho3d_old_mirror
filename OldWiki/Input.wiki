@@ -1,0 +1,18 @@
+The Input library provides the input handler. Before it can be instantiated, the [Rendering Renderer] needs to exist. Each frame, the input handler's update() function needs to be called to pump the operating system events. By default, [Engine] handles both the initialization and the periodic update.
+
+After initialization, the input handler takes over the application mouse cursor. It will be hidden, so the [UI user interface]'s cursor rendering functionality should be used if necessary. The cursor can be in either confined or non-confined mode. In confined mode (default) it is always forcibly centered to the window, so that mouse delta motion can be read "infinitely" in each direction. Non-confined mode is set by calling setClipCursor(false). In this case the cursor may freely travel out of the application window, which also means that infinite mouse delta motion can no longer be relied upon.
+
+The input handler provides both input events and functions to read the current input state. The input events include:
+
+  * EVENT_MOUSEBUTTONUP. A mouse button has been released.
+  * EVENT_MOUSEBUTTONDOWN. A mouse button has been pressed.
+  * EVENT_MOUSEMOVE. The mouse has been moved. Both movement and cursor position will be sent, but the position is only useful in non-confined mode.
+  * EVENT_KEYUP. A key has been released.
+  * EVENT_KEYDOWN. A key has been pressed.
+  * EVENT_CHAR. Translates a keypress to Latin-1 charset for text entry. This is currently the only way to get translated key input.
+
+The input state API differentiates between the initiation of a key/mouse button press, and holding the key or button down. getKeyPress() and getMouseButtonPress() return true only for one frame (the initiation) while getKeyDown() and getMouseButtonDown() return true as long as the key or button is held down.
+
+From the input handler you can also query whether the application is active/inactive, or minimized.
+
+Joystick input handling is to come some day in a future SVN revision.

@@ -1,0 +1,18 @@
+Defines collision geometry for the physics simulation through an XML file. Can refer to simple geometric shapes like boxes or spheres, or to a 3D model, which can be used either as a triangle mesh, as a convex hull, or as a height field.
+
+The possible elements: (position and rotation attributes are optional; an identity transform is assumed if missing. LOD level attribute is also optional; the default from the model file will be used if missing.)
+
+{{{
+<collisionshape>
+    <box [size="x y z" | halfsize="x y z"] position="x y z" rotation="w x y z" />
+    <sphere radius="r" position="x y z" rotation="w x y z" />
+    <cylinder radius="r" height="h" position="x y z" rotation="w x y z" />
+    <capsule radius="r" height="h" position="x y z" rotation="w x y z" />
+    <cone radius="r" height="h" position="x y z" rotation="w x y z" />
+    <trianglemesh name="Model.mdl" lodlevel="l" />
+    <convexhull name="Model.mdl" lodlevel="l" />
+    <heightfield name="Model.mdl" xsize="x" zsize="z" lodlevel="l" />
+</collisionshape>
+}}}
+
+When a model is used as height field, it should be planar in its shape. The X & Z size attributes are the number of points in those directions; the Y axis will be used to determine the actual height at each point. If the sizes are missing, they will be guessed.

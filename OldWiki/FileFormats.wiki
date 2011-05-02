@@ -1,0 +1,11 @@
+Urho3D tries to use existing file formats whenever possible, and define custom file formats only when absolutely necessary. Currently used file formats are:
+
+  * *xml* - All human- or semi-human-editable data, like material, particle emitter, physics collision shape, shader, sound, texture and UI element descriptions, or XML-serialized scenes. In addition, the OgreImporter tool reads [http://www.ogre3d.org OGRE] .mesh.xml and .skeleton.xml files.
+  * *jpg*, *png*, *gif*, *tga*, *bmp*, *dds* - Texture images. DDS loading in Urho3D supports DXT1, DXT3 and DXT5 compressed surfaces.
+  * *vs2*, *vs3*, *ps2*, *ps3* - HLSL vertex and pixel shaders compiled into bytecode using ShaderCompiler
+  * *mod*, *xm* - Tracked music formats.
+  * *ogg*, *wav* - Sound effects.
+  * *mdl* - Custom 3D model and skeleton binary format. [ModelFormat Described here.]
+  * *ani* - Custom 3D model animation binary format. [AnimationFormat Described here.]
+  * *pak* - Custom package file format. [PackageFormat Described here.]
+  * *bin* or *dat* - Custom binary scene format for optimized loading or savegames. [BinarySceneFormat Described here.]

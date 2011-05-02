@@ -1,0 +1,19 @@
+{{{
+byte[4]    Identifier UANI
+cstring    Animation name
+float      Length in seconds
+uint       Number of tracks
+
+  For each track:
+  cstring    Track name (practically same as the bone name that should be driven)
+  byte       Mask of included animation data. 1 = bone positions 2 = bone rotations 4 = bone scaling
+  uint       Number of keyframes
+
+    For each keyframe:
+    float      Time position in seconds
+    Vector3    Position (if included in data)
+    Quaternion Rotation (if included in data)
+    Vector3    Scale (if included in data)
+}}}
+
+Note: animations are stored using absolute bone transformations. Therefore only lerp-blending between animations is supported; additive pose modification is not.

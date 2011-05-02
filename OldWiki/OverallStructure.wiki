@@ -1,0 +1,27 @@
+From a code structure viewpoint Urho3D is a collection of static libraries, that enable various functionality. They are independent where possible: for example the [Rendering Renderer] could be used without the [Engine], if only rendering capabilities were desired.
+
+===Urho3D libraries===
+
+  * [Audio] Audio subsystem. Needs a window handle from Renderer to be usable.
+  * [Common] Various utilities such as events, shared pointers, mutex, and data deserialization/serialization.
+  * [Engine] Ties the subsystems together, and implements the frame update & rendering iteration (actually looping it constantly is left to the application).
+  * [Input] Input handling. Depends on Renderer.
+  * [Math] Math library including bounding volumes, vectors, matrices, quaternions...
+  * [Network] Reliable and unreliable UDP communications using ENet.
+  * [Physics] Physics subsystem: implements a physics world, a rigid body scene node, collision shapes and joints using Open Dynamics Engine.
+  * [Rendering Renderer] Implements window management and rendering.
+  * [Resources Resource] Implements the resource cache and the basic resource types that do not belong anywhere else: images (not actual GPU textures!) & XML files.  
+  * [Scene] Defines the scene, entities & components, and also the basic scene node class.
+  * [Scripting Script] Scripting functionality.
+  * [UI] Implements the user interface. Depends on Renderer & Input.
+
+===Third-party libraries===
+
+  * [http://www.angelcode.com/angelscript/ AngelScript] Implements the scripting language.
+  * [http://enet.bespin.org/ ENet] Implements UDP networking.
+  * [http://www.freetype.org/ FreeType] Implements font rendering.
+  * [http://assimp.sourceforge.net/ Open Asset Import Library] Imports various 3D file formats.
+  * [http://www.ode.org/ Open Dynamics Engine] Implements the actual physics simulation.
+  * [http://codesuppository.blogspot.com/2006/03/john-ratcliffs-code-suppository-blog.html StanHull] Implements convex hull generation from triangle meshes.
+  * [http://nothings.org/ STB] Contains the stb_image and stb_vorbis libraries, which implement image loading and Ogg Vorbis decoding.
+  * [http://www.grinninglizard.com/tinyxml/ TinyXML] Implements parsing of XML files.

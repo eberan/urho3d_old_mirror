@@ -1,0 +1,15 @@
+A scene node has a transform (position, rotation and scale) and possibly child nodes. The child node's world transform depends on the parent's, allowing for hierarchical composition that is useful for example in skeletal animation. 
+
+A scene node in Urho3D is always a [Scene component]. The base scene node class, simply called Node, is defined in the Entity library. Major subsystems all define their own scene nodes, and you can define more by subclassing. The [Rendering Renderer] defines currently most of them.
+
+Child nodes are managed through addChild() and removeChild() functions. When adding a child node, a shared pointer is required, because the parent node will then "own" the child until detached.
+
+===Node dirtying===
+
+The concept of "dirtying" is an important part in keeping the calculations related to the nodes and their various getter functions effective. It would be quite ineffective to calculate the full hierarchical world transform for a node each time it was asked. Instead, there is a dirty flag to tell whether it should be recalculated.
+
+By default, a basic scene node (of the Node class) will be dirtyed whenever it changes its position, rotation or scale, or whenever it becomes reparented. This happens through the markDirty() function, which marks the node itself and also all of its child nodes (recursively) dirty.
+
+Then there is a virtual function onMarkedDirty(), called during markDirty(), which is empty for the basic scene node, but marks various other state dirty for other node types. For example a node derived form [VolumeNode] marks itself for [Octree] reinsertion whenever its transform or bounding box changes, a [Camera] marks its viewing frustum dirty, and a [Bone] marks its skinning information dirty.
+
+Other virtual functions in Node are related to the hierarchy changing (also empty by default): onParentChanged(), onChildAdded() and onChildRemoved().

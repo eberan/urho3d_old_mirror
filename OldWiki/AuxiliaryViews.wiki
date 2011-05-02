@@ -1,0 +1,35 @@
+Urho3D supports also rendering auxiliary views to textures in addition to rendering the main view(s) to the backbuffer. To use, create a rendertarget texture and define a viewport for its render surface. The auxiliary view will then be rendered whenever the texture in question is visible in the main view. For example this code would replace the diffuse texture of the material Test.xml with an auxiliary view:
+
+{{{
+Camera* extraCamera = mScene->createComponent<Camera>();
+extraCamera->setPosition(Vector3(0.0f, 0.0f, 2.0f));
+extraCamera->setMaterialQualityOverride(QUALITY_LOW);
+extraCamera->setDrawShadowsOverride(false);
+mCamera->addChild(extraCamera);
+
+SharedPtr<Texture2D> rtTex(new Texture2D(mEngine->getRenderer(), TEXTURE_RENDERTARGET));
+rtTex->setSize(512, 512, D3DFMT_A8R8G8B8);
+
+rtTex->getRenderSurface()->setViewport(Viewport(mScene, extraCamera));
+rtTex->setBackupTexture(mCache->getResource<Texture2D>("Textures/Diffuse.dds"));
+
+Material* mat = mCache->getResource<Material>("Materials/Test.xml");
+MaterialTechnique* tech = mat->getTechnique(0);
+tech->setTexture(TU_DIFFUSE, rtTex);
+}}}
+
+The viewport is not assigned directly to the texture because of cube map support: a cubic rendertarget has 6 render surfaces, and done this way, a different camera could be assigned to each.
+
+Note the setting of a "backup texture": because it is illegal to sample a texture that is also being simultaneously rendered to (in cases where the rendertarget texture becomes "recursively" visible in the auxiliary view), the backup texture can be used to specify which texture should be used in place instead. In the code above, the original texture is used.
+
+When using deferred rendering, there is currently a limitation that the auxiliary view rendertarget can not be bigger in either width or height than the rendering window, due to the G-buffer's size. Overcoming this would require reserving an additional G-buffer for large auxiliary views.
+
+===Optimizations===
+
+Rendering detailed auxiliary views can easily have a large performance impact. Some things you can do for optimization with the auxiliary view camera:
+
+  * Set the far clip distance as small as possible.
+  * Set the camera's viewmask to for example VIEW_REFLECTION, then clear that viewmask bit from the scene nodes you don't need rendered.
+  * Force shadows off using the camera's setDrawShadowsOverride() function.
+  * Set lower light detail using setLightDetailOverride().
+  * Set lower material quality using setMaterialQualityOverride().

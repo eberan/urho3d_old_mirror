@@ -1,0 +1,16 @@
+This tool generates HLSL [Shader shader] permutations using an XML definition file that describes the permutations, and their associated HLSL preprocessor defines.
+
+The output consists of shader bytecode for each permutation, generated using fxc from the DirectX SDK, as well as an output XML file that describes the constant parameters and texture units (for pixel shaders only) used by each.
+
+Usage:
+
+{{{
+ShaderCompiler <definitionfile> <outputpath> [SM3] [define1] [define2] ..
+
+Note: .hlsl files will be loaded from definition file directory, and binary
+code will be output to same directory as the output file.
+}}}
+
+It is possible to give additional defines from the command line. These will then be present in each permutation. SM3 is a special define which enables compilation of VS3.0 and PS3.0 code, otherwise VS2.0 and PS2.0 code is generated.
+
+fxc needs to be available through the system PATH. 

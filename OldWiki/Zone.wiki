@@ -1,0 +1,9 @@
+A [SceneNode scene node] that defines a bounding box, a priority value, and the following global or scene-wide rendering parameters:
+
+  * Ambient light color
+  * Fog color, start and end range
+  * Viewport background color
+
+When rendering, an oriented bounding box test is used to determine the zone inside which the [Camera] resides. If the camera is inside several zones, the zone with the highest priority value takes effect. Then, the parameters above are used for rendering the whole scene, and the zone's lightmask is used to check which [Light Lights] should be rendered.
+
+The zones could for example easily be used to implement different fogging and ambient light conditions above and below water.

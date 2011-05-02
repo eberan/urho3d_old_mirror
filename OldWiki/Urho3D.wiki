@@ -1,0 +1,8 @@
+#labels Featured
+Urho3D is a lightweight, object-oriented Win32 / Direct3D9 rendering and game engine implemented in C++.
+The purpose of this wiki is to serve as documentation on using Urho3D, and also tell about its internal
+details.
+
+Use the sidebar on the left to navigate.
+
+Some suggested starting points: [Building], [Examples] and [OverallStructure Overall structure].

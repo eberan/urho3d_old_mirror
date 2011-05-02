@@ -1,0 +1,1 @@
+A physics [Scene component] that connects either one RigidBody to the static world, or two bodies together.

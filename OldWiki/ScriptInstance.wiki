@@ -1,0 +1,1 @@
+A [Scene component] that instantiates a [Scripting script class] from within a ScriptFile resource. After being instantiated successfully, operations that would normally be performed in C++, like scene updates, [EventSystem event handling] and [Serialization serialization] are forwarded to the script code.

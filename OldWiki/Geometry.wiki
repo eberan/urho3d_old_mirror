@@ -1,0 +1,3 @@
+In Urho3D, Geometry is an object which refers to one or several vertex buffers, an index buffer, and defines an index draw range. Used to define a rendering batch.
+
+Note that by definition, Geometry supports rendering only indexed geometry.

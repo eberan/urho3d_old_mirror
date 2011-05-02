@@ -1,0 +1,51 @@
+The audio subsystem implements output of a mono or stereo audio stream using DirectSound. It requires a window handle from the [Rendering Renderer] during creation - this is automatically taken care of by the [Engine].
+
+The audio stream can be currently utilized in the following ways:
+
+  * Playing raw audio, Ogg Vorbis or WAV sounds using the StereoChannel component. This allows manual stereo panning of mono sounds; stereo sounds will be output with their original stereo mix.
+  * Playing the above sound formats in pseudo-3D using the PositionalChannel component. It has stereo positioning and distance attenuation, but does not (at least yet) filter the sound depending on the direction.
+  * Playing MOD & XM tracked music files.
+
+The output is software mixed for an unlimited amount of simultaneous channels. Ogg Vorbis sounds are decoded on the fly, and decoding them can be memory- and CPU-intensive, so WAV files are recommended when a large number of short sound effects need to be played.
+
+For purposes of volume control, each sound channel is classified into one of three categories:
+
+  * Sound effects
+  * Music
+  * Voice
+
+Then, also a master volume control exists that affects the final output level of all of those categories.
+
+===Examples===
+
+Creating a new sound channel and starting sound playback on it at the frequency of 44.1 kHz:
+
+{{{
+SharedPtr<StereoChannel> channel(new StereoChannel(mEngine->getAudio()));
+channel->play(mCache->getResource<Sound>("Sounds/BigExplosion.wav"), 44100);
+}}}
+
+Note that you control the lifetime of the sound channel; the audio subsystem doesn't. However if the channel is added to an entity it can be set to remove itself when playback stops (see setAutoRemove() in StereoChannel or PositionalChannel.)
+
+Starting playback of an XM file:
+
+{{{
+SharedPtr<XM> song(mCache->getResource<XM>("Music/NinjaGods.xm"));
+song->play();
+}}}
+
+Note that tracked format songs are unusually "active" for being [Resources resources]: they hold their own state for playback, and instantiate the required sound channels.
+
+===Sound parameters===
+
+A standard WAV file can not tell whether it should loop, and raw audio does not contain any header information. Sound parameters can optionally be specified through an XML file that has the same name as the sound, but .xml extension. Possible elements and attributes are described below:
+
+{{{
+<sound>
+    <format frequency="x" sixteenbit="true|false" stereo="true|false" />
+    <loop enable="true|false" start="x" end="x" />
+</sound>
+}}}
+
+The frequency is in Hz, and loop start and end are bytes from the start of audio data. If a loop is enabled without specifying the start and end,
+it is assumed to be the whole sound.

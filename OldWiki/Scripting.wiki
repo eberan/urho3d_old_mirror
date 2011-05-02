@@ -1,0 +1,132 @@
+Urho3D uses the statically-typed, object-oriented [http://www.angelcode.com/angelscript AngelScript] as its scripting language.
+
+To avoid unnecessary executable size growth in applications that do not use scripting, the [Engine] does not by default instantiate the script engine. Call Engine::createScriptEngine() to do that. This should be done before creating a [Scene] or trying to load script files, so that the necessary component & resource factories are created first.
+
+There are three primary ways the scripting language can be interacted with:
+
+===Immediate execution===
+
+Immediate execution takes one line of [http://www.angelcode.com/angelscript AngelScript], compiles it, and executes. This is not recommended for anything that needs high performance, but can be used for example to implement a developer console. Call ScriptEngine::execute() to use. For example:
+
+{{{
+scriptEngine->execute("print(\"Hello World!\");");
+}}}
+
+===Calling a function from a script file===
+
+This requires a successfully loaded ScriptFile resource. To identify the function to be called, its full declaration is needed. Parameters are passed in a Variant vector. For example:
+
+{{{
+ScriptFile* file = cache->getResource<ScriptFile>("Scripts/MyScript.as");
+
+VariantVector parameters;
+parameters.push_back(Variant(100)); // Add an int parameter
+file->execute("void myFunction(int)", parameters); // Execute
+}}}
+
+ScriptFile::execute() also has an overload which takes a function pointer instead of querying by declaration. Using a pointer is naturally faster than a query, but note that the query results are also stored to an internal cache, so repeated queries for the same declaration do not need to go to the AngelScript module level each time. Storing function pointers is risky in case the ScriptFile resource is reloaded, because then the pointers will be invalidated.
+
+===Instantiating a script object===
+
+The component ScriptInstance can be used to instantiate a specific class from within a script file. After this the script object can respond to scene updates, [EventSystem events], [Serialization serialization] and network updates much like a component written in C++ would do, if it has the appropriate methods implemented. For example:
+
+{{{
+ScriptInstance* instance = entity->createComponent<ScriptInstance>();
+instance->setScriptClass(cache->getResource<ScriptFile>("Scripts/MyClass.as"), "MyClass");
+}}}
+
+The class must implement the empty interface ScriptObject, so that the object can also be accessed from script using ScriptInstance's getScriptObject() function.
+
+The following methods that implement the component behaviour will be checked for. None of them are required.
+
+  * void start()
+  * void stop()
+  * void update(float)
+  * void postUpdate(float)
+  * void updateFixed(float)
+  * void postUpdateFixed(float)
+  * void save(Serializer&)
+  * void load(Deserializer&)
+  * void postLoad()
+  * void saveXML(XMLElement&)
+  * void loadXML(const XMLElement&)
+  * void writeNetUpdate(Serializer&, const NetUpdateInfo&)
+  * void readNetUpdate(Deserializer&, const NetUpdateInfo&)
+  * void postNetUpdate()
+  * void interpolate(bool)
+  * array`<`ComponentRef`>` getComponentRefs()
+  * array`<`Resource@`>` getResourceRefs()
+
+The update methods above correspond to the variable timestep scene update and post-update, and the fixed timestep physics world update and post-update. The application-wide update events are not handled by default.
+
+Network serialization has been simplified: writeNetUpdate() only needs to output a data stream (should be fixed size), it is automatically compared to the last data acked by the client, and is not sent if the binary content is the same.
+
+The start() and stop() methods do not have direct counterparts in C++ components. start() is called just after the script object has been created. stop() is called before the ScriptInstance is destroyed or its script class is changed.
+
+Subscribing to events from script is straightforward: the name of the event and the handler method's name are required. Subscribing to a specific sender's event is also possible, by giving the sender as the first parameter. The handler method must either have a specific signature similar to C++ event handlers, or return void and take no parameters. For example, here the start() function hooks to the application-wide update event, and to the Renderer's ScreenMode event:
+
+{{{
+void start()
+{
+    subscribeToEvent("Update", "handleUpdate");
+    subscribeToEvent(renderer, "ScreenMode", "handleScreenMode");
+}
+
+void handleUpdate(StringHash eventType, VariantMap& eventData)
+{
+    ...
+}
+}}}
+
+In addition to the predefined methods above and event handlers, arbitrary methods can be executed on the instance through its execute() function, which works much like ScriptFile::execute(), except that the script object to use is implied. For example:
+
+{{{
+VariantVector parameters;
+parameters.push_back(Variant("string"));
+parameters.push_back(Variant(true));
+instance->execute("void myMethod(const String& in, bool)", parameters);
+}}}
+
+The ScriptInstance can be put in a disabled state by calling setEnabled(false) on it. In this case the update methods, writeNetUpdate(), interpolate(), getComponentRefs() and event handlers will not be executed. This can be used to reduce CPU load in a large or densely populated scene.
+
+===Handling events procedurally===
+
+In the case where scripted event handling should not be tied to a scene entity, events can also be subscribed to whenever a script function (not an object method) is executing. Alternatively the script file's addEventHandler() function can be called directly. In this case the script file becomes the event handler, and responds to the event as long as it is not unloaded or reloaded, or the event is not unsubscribed from.
+
+===The script API===
+
+Much of the Urho3D classes are exposed to scripts, however things that require low-level access or high performance (like direct vertex buffer access or immediate rendering) are not. Also for scripting convenience some things have been changed from the C++ API:
+
+  * Public member variables are exposed in lowercase and without the 'm' prefix. For example x, y, z in Vector3.
+
+  * Subsystems and important objects exist as global properties: engine, resourceCache (or simply cache), renderer, pipeline, audio, input, ui, uiRoot, uiCursor, client, server, console, debugHud, debugRenderer.
+
+  * Additional global properties exist for accessing the ScriptInstance, its entity, the scene and the standard scene extensions: self, entity, scene, octree, physicsWorld. When an object method is not executing, these are null.
+
+  * The currently executing script file can be retrieved through the scriptFile property.
+
+  * An entity's property map is also accessible through its property called properties. A UI element's userdata variant map is likewise accessible through its userData property.
+
+  * Printing raw output to the log is simply called print(). The rest of the logging functions are logDebug(), logInfo(), logWarning() and logError().
+
+  * Functions that would take a StringHash or ShortStringHash parameter usually take a string instead. For example sending events, requesting resources and accessing components.
+
+  * Remote event sending is exposed as global functions. When executed, the scene that the ScriptInstance belongs to is used automatically.
+
+  * Most of StringUtils have been exposed as methods of the string class or the corresponding classes. For example {{{string.toLower(); Vector3.toString();}}}
+
+  * Template functions for getting components or resources by type are not supported. Instead automatic type casts are performed as necessary. For example {{{Model@ model = cache.getResource("Model", "Models/Ninja.mdl");}}}
+
+===Limitations===
+
+There are some complexities of the scripting system one has to watch out for:
+
+  * During the execution of the script object's constructor, the object is not yet associated with the ScriptInstance, and therefore subscribing to events, or trying to access the entity or scene will fail. The use of the constructor is best reserved for initializing member variables only.
+
+  * There is a maximum allowed nesting level (currently 32) for execution that moves between C++ API functions & AngelScript. Nested execution typically occurs if you send an event to another ScriptInstance from a scripted event handler. If the nesting level is exceeded, an error will be logged and the script code that would have required the extra nesting level will not be executed.
+
+  * When the resource request for a particular ScriptFile is initially made, the script file and the files it includes are compiled into an AngelScript script module. Each script module has its own class hierarchy that is not usable from other script modules. Particularly casts to/from base classes will not work across script modules as you would expect, as the base class will actually be uniquely defined within each script module. Interfaces should work across modules. If access to a class hierarchy is needed, and using interfaces is not sufficient, it is best to ensure that only a single script module, which includes all the necessary classes, will be compiled. This could be for example the game's main program class, which would simply #include all the game object classes it needs. It may sound ugly to include a large number of files, but actually it is more memory-optimal to make one large script module, than several smaller ones which would duplicate the definition for eg. a game object base class.
+
+  * If a ScriptFile resource is reloaded, all the script objects created from it will be destroyed, then recreated. They will lose any stored state as their constructors and start() methods will be run again. This is rarely useful when running an actual game, but may be helpful during development.
+  
+  * For performance reasons and to guarantee immediate removal of expired objects, AngelScript garbage collection has been disabled for script classes and the array type. This has the downside that circular references will not be detected. Therefore, whenever you have object handles in your script, think of them as if they were C++ shared pointers and avoid making circular references with them.

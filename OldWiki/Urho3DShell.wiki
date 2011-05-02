@@ -1,0 +1,8 @@
+An Urho3D example program which instantiates the Urho3D engine and either loads & runs a script file, or loads a scene. The script file should implement the function void start(), which should in turn subscribe to all necessary events, such as the application update. If a scene is loaded, it should contain script objects to implement the application logic.
+
+There are batch files in the Bin directory which run various example scripts:
+
+  * Avatar.bat - simple player character example
+  * Editor.bat - the Urho3D scene editor
+  * NSWScript.bat - a script based remake of NinjaSnowWar
+  * GraphicsTest.bat - corresponds to the old Test example, remade in script

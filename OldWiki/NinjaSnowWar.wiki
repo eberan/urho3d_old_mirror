@@ -1,0 +1,4 @@
+NinjaSnowWar is a third person action game example included with Urho3D. Was originally implemented with [http://www.ogre3d.org OGRE], [http://www.ode.org ODE] & [http://www.ogre3d.org/tikiwiki/OgreODE OgreODE] in the year 2007. It demonstrates the use of [Scene entity-components] to build the audio, visual and logic aspects of a game. However, because it's a port / reimplementation from another set of libraries, the code may not in parts be fully "idiomatic" of Urho3D, and so care is advised when using it for
+learning purposes.
+
+By default, the game runs in singleplayer mode. However, a co-op multiplayer mode exists as well. See [Network].

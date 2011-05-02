@@ -1,0 +1,174 @@
+The Network library provides reliable and unreliable UDP messaging using [http://enet.bespin.org ENet]. A server can be created that listens for incoming connections, and client connections can be made to server(s).
+
+Packets are sent using a fixed number of channels (4 by default); packet order is guaranteed within each channel. If received out-of-order, reliable packets will be stalled until all in a sequence have been received, while older unreliable packets will simply be dropped if a newer packet has already been received. There is also an option to send unsequenced unreliable packets.
+
+Note that by default the Network library itself does not care of what is being sent (low-level networking.) In contrast, the Client & Server classes inside the Engine library provide scene replication, sending client controls, and remote events (high-level networking.) Both modes of operation are described below.
+
+===Low-level networking===
+
+To service outgoing and incoming packets, one should call the update() function on the Network instance as often as possible.
+
+Outgoing packets are queued by calling send() on the networking peer. Packets can be received from networking peers using either manual unqueuing by calling receive(), or [EventSystem events]. Manual unqueuing is the default. In any case, events will be sent to notify of peer connections and disconnections, see NetworkEvents.h for the event definitions:
+
+  * EVENT_PEERCONNECTED
+  * EVENT_NETWORKPACKET
+  * EVENT_PEERDISCONNECTED
+
+For a simple chat application example of using the low-level networking functionality, see NetworkTest.
+
+All network packets are compressed using ENet's built-in compression.
+
+===High-level networking===
+
+The Client & Server classes in the Engine library implement a server-authoritative networking model for multiplayer. The Server runs one or more scenes, and the Client can join to one of them at a time. The following data will then be sent:
+
+  * Scene replication delta updates, server to client.
+  * Client controls, client to server.
+  * Remote events, both server to client and client to server. These are like ordinary [EventSystem events], but will be executed only on the receiving end.
+
+Communication between the Server & Client uses a challenge-response scheme controlled by two pre-defined hash keys in Connection.cpp. Important: no actual security is promised! Substitute your own security scheme as necessary.
+
+The high-level networking protocol uses the first two of the 4 default channels (0 & 1), so channel numbers 2 & 3 are left free for custom use.
+
+===Joining a scene===
+
+The client does not choose a scene to join on its own, rather the server should decide it. After a client successfully connects, it sends an identity packet containing the username, which causes the EVENT_CLIENTIDENTITY event to be sent on the server. This is a good opportunity to set the scene to join, by calling Server::setClientScene(). A scene info packet is now sent to the client, and the client will either join the scene right away, or download any missing package files first.
+
+Note that just like the scene(s) to use must be added to the Server, the Client must also be supplied with an existing scene for receiving network updates. The client and server scenes must have the same extensions (the default extensions are [Octree] and [Physics PhysicsWorld]; if a scene has been created through the [Engine], this should not be a problem.)
+
+===Scene replication===
+
+Scene replication happens through a server update message, sent by default 30 times per second. It consists of the following actions:
+
+  * Create an entity. Includes the full current state of its components.
+  * Add components to an entity.
+  * Update components of an entity. Only the changed variables are sent.
+  * Remove components from an entity.
+  * Update properties of an entity.
+  * Remove an entity.
+
+To cut down on the needed bandwidth, and to protect game data that the client is not supposed to see, there are ways to control which entities and components will be replicated. This is primarily accomplished with an 8-bit bitmask called "netflags" that exists in Scene, Entity and Component. The netflags can also be used to detect whether code needs to run non-networked, server, or client logic.
+
+  * NET_AUTHORITY - is set on server scenes, entities and components. Do not set yourself.
+
+  * NET_PROXY - is set on client scenes, entities and components. Note that in non-networked (singleplayer) scenes, neither the NET_AUTHORITY or NET_PROXY bits are set. Do not set yourself.
+
+  * NET_OWNER - is set on the client entity and its components if the entity is owned by the client. Is never set on the server. Do not set yourself. 
+
+  * NET_OWNERPREDICT - perform client-side prediction on the owning client to counteract latency. Needs to be set on both the entity, and on components that should be predicted. Other clients will not see this flag. Typically set for player-controlled characters.
+
+  * NET_TRANSIENTPREDICT - propagate prediction from physics collisions with an owner-predicted entity. This prediction stays only for a limited time. Like above, needs to be set on both the entity and the predicted components. Typically set for dynamic physics objects that can be moved by players.
+
+  * NET_SYNCTOALL - replicate this entity or component to all clients. This is the default.
+
+  * NET_SYNCTOOWNER - replicate this entity or component only to the owning client. 
+
+  * NET_SYNCTONONE - do not replicate this entity or component.
+
+By default entity properties are not replicated. Each property that needs replication must be explicitly marked by calling setPropertySync() on the entity.
+
+In addition there is the concept of a local entity. A local entity has an ID higher than 65535, and will never be replicated. They are important for avoiding entity ID clashes when for example spawning client-side only effect entities, as a client can never authoritatively reserve entity ID's from the non-local range. A local entity can be created by setting the "local" bool parameter true when calling Scene::createEntity(). Also, a client scene that has the NET_PROXY bit set will actually only create local entities on its own.
+
+===Component delta updates===
+
+Comparably to [Serialization scene serialization] to a file, code must be written for each component to write and read network delta updates, as well as to perform a post-update step after the whole update has been read (to resolve any references to other components or entities). For this, the virtual functions writeNetUpdate(), readNetUpdate() and postNetUpdate() exist. Additionally, the client needs to interpolate towards the most recent server update; for this it must store the interpolation target values, and implement the function interpolate(). 
+
+For a somewhat comprehensible example, see the network update code for [SceneNode Node], which consists of tracking position, rotation, scale and parent node separately, and writing out only those that have changed. Note that writeNetUpdate() needs to produce two outputs: the delta update actually sent to the client, and a full state stored server-side to use in comparing against the last state acked by the client.
+
+See the file ReplicationUtils.h for delta update utility functions. When no previous acked state exists for a component, the needed amount of update data can still be cut down by comparing against the component's default values instead. For example, the default values for a transform are: zero position, identity rotation, and unity (1,1,1) scale.
+
+Currently, working replication and interpolation code exists for the following components:
+
+  * AnimatedModel
+  * AnimationController
+  * [Camera]
+  * InstancedModel
+  * [Joint]
+  * [Light]
+  * [SceneNode Node]
+  * ParticleEmitter
+  * PositionalChannel
+  * RigidBody
+  * [Skybox]
+  * StaticModel
+  * StereoChannel
+  * [Zone]
+
+Some components, such as CustomObject which defines actual vertex data, lend themselves poorly to replication and will probably never be supported by default.
+
+===Client controls===
+
+Several times per second (30 by default) the client's last controls are sent to the server. The Client does not poll for input on its own, rather it sends the event EVENT_CONTROLSUPDATE just before sending the packet, and as a response the application should set the current controls with Client::setControls(). They are defined by the Controls struct inside the Input library, and consist of:
+
+  * Buttons - 32 bits for the up/down state of control keys and buttons.
+  * Yaw - absolute mouse yaw in degrees.
+  * Pitch - absolute mouse pitch in degrees.
+  * ExtraData - a VariantMap for any extra fields that are necessary, by default empty.
+
+On the server-side, the last seen controls are stored for each client connection, and the EVENT_USERCONTROLS event is sent when new controls are received. It is up to the application logic to decide what to do with them.
+
+The client controls packet also includes the client's viewpoint coordinates for spatial entity relevancy calculations, see more on this below.
+
+===Remote events===
+
+Remote events will be sent along with the next server or client update, and they behave mostly like ordinary events, with a few differences:
+
+  * Ordinary events are application-wide. Remote events are always queued through the Scene that is being used for networking, using the sendRemoteEvent() functions. Then, the Client or Server will look for new events in the Scene's remote event queue to actually send them.
+
+  * Ordinary events can optionally target a specific EventListener, which can be of any type. For a remote event, the optional target can only be a specific entity in the receiver's scene. This is called "remote entity event."
+
+  * In case of packet loss, there might be delay in delivering the remote event. If the event has only significance for a short time, a maximum time-to-live value can be set (calculated in server frames, so 30 would be one second by default), after which the event will be discarded if not sent yet. The default time-to-live value is 0, which means to keep sending indefinitely, until acked. Note that regardless of how many times the event is resent, the receiver will actually process it only once.
+
+  * Remote events must be registered before they can be sent or received, by calling registerRemoteEvent(). This is to prevent attacks where internal engine events (such as EVENT_SCENEUPDATE or EVENT_WINDOWMESSAGE) would be sent remotely.
+
+===Client-side prediction===
+
+Client-side prediction needs rewinding and replaying the scene whenever a server update arrives. For the most part this is handled transparently by the Client, but there are some things to watch out for:
+
+  * When the function isPlayback() on a scene/entity/component returns true, replaying is being done. Some operations, like starting sounds or advancing particle emitters need to be skipped during this, as the same frames might be played over and over until finally acked by the server.
+
+  * The application must implement a handler for the event EVENT_CONTROLSPLAYBACK. Its purpose is to feed old controls to the player-controlled character for replay. The old controls are received as event parameters. See Game.cpp in NinjaSnowWar for details.
+
+===Entity relevancy===
+
+By default all entities and components whose netflags allow it will be constantly updated if there are changes. In a large scene that might require unacceptably high network bandwidth. Therefore it's possible to limit the maximum distance over which an entity is considered relevant and will be updated. This is accomplished by calling the entity's setNetUpdateDistance() function. There are some additional rules to consider:
+
+  * A netupdatedistance of 0 (the default) means the entity will always be relevant.
+
+  * Owned entities will always be relevant to the owner.
+
+  * If a component in a relevant entity depends on a component in another entity (for example by being a child scene node), that entity will also be relevant. Tracking the dependencies requires components to implement the function getComponentRefs() as necessary.
+
+  * So that spatial relevancy can be correctly considered, the client application logic needs to update the client viewpoint position by calling Client::setPosition(). It is most straightforward to do this when also setting the current controls.
+
+===File transfers===
+
+On the server, required package files can be added to the scene using the function addRequiredPackageFile(). After this the server will advertise those packages (filename, total size and checksum) in the scene info. The Client will then automatically download the packages it does not already have, before actually joining the scene. For storing the downloads, a valid directory must be given to the Client in its constructor.
+
+Note that the Server will refuse to transmit any other files than the specified packages.
+
+===Limitations===
+
+For successful networked operation, the following limitations have to be observed:
+
+  * There can be a maximum of 65535 networked entities in a scene. To not consume this amount needlessly, any static objects should be local entities, preloaded from a scene file.
+
+  * The name & netflags of an entity or component, and the groupflags & owner of an entity are only evaluated on the first update to the client. After this, no changes to them will be sent. Practically it is best to set the name, netflags, groupflags and owner immediately after creation, and not touch them afterward.
+
+  * Normally entity groupflags are 32-bit. Over the network they are sent VLE-coded, which does not include the highest 3 bits.
+
+  * If many components of the same type exist inside the same replicated entity, they must have unique names. For example, the entities in NinjaSnowWar might have several sounds attached to them. Use the utility function Entity::getUniqueComponentName() to generate unique 1-letter names.
+
+  * Removal of entity properties is not replicated.
+
+  * Client code should never remove non-local entities or components. Creating new components to non-local entities on the client is strongly discouraged. Local entities can be freely created instead.
+
+  * When allowing game logic to run on both the client and server, be careful with the direction of data flow: because the server sends only delta updates it itself deems necessary, it is easy to desync the client's perception by modifying some component data the server is not aware of. The exception is predicted components, which will always be reset to a fully consistent state when a new server update is received.
+
+===Closing notes===
+
+High-level networking is a complicated subject. For an example that exercises all of replication, client controls, remote events and client-side prediction, see NinjaSnowWar, which implements an optional co-op multiplayer mode. Like the low-level networking example above, the server uses UDP port 1234 to listen for incoming connections.
+
+To run a server, use the command {{{NinjaSnowWar server}}}
+
+To connect to a server, use the command {{{NinjaSnowWar <address> [username]}}}

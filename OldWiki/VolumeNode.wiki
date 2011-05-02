@@ -1,0 +1,13 @@
+A [SceneNode scene node] that defines a volume in addition to its transform. Can be added to the [Octree].
+
+Volume nodes have several virtual function that define the basic functionality of the node in respect to octree updates and rendering:
+
+  * onWorldBoundingBoxUpdate(). Recalculates the node's world-space bounding box on demand. This function can behave in radically different ways depending on the node in question. For static models it is simple: take the object-space bounding box and transform it by the node's current world transform. But [Light Light] for example has to take into account the light type. Note that this function is pure virtual: it must be implemented by subclasses.
+
+  * updateNode(). Optionally called during the octree update, before reinserting the node into a new octant. Can be used to implement rendering-related logic that is independent on the visibility of the node. AnimatedModel updates animation here to ensure that the scene node hierarchy is fully updated before culling checks. This function should be prepared for a null camera pointer specified in the FrameInfo structure, when the scene is being run in headless mode. Also note that for optimization reasons, is not automatically called before each reinsertion check, but rather needs to be requested by calling markForUpdate().
+
+  * updateDistance(). Calculates the node's distance from the current camera. It is used for distance sorting, and for checking if the node is too far away to be rendered. [GeometryNode GeometryNode] overrides this to also calculate the LOD scaled distance.
+
+  * overrideTransforms(). Called just before rendering. This allows the node to specify custom model and view matrices. [Light Light] uses this to define the transform for light volume geometry, and [Skybox Skybox] uses it to fix the skybox in place regardless of camera position.
+
+  * getDebugGeometry(). Allows the node to define simple geometry for debug rendering.

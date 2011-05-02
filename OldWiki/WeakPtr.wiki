@@ -1,0 +1,1 @@
+A template pointer class which knows whether its target object (which must derive from RefCounted) still exists, but does not affect its lifetime, like SharedPtr does.

@@ -1,0 +1,75 @@
+Materials describe how to render 3D scene objects. They consist of texture references, shader parameters and renderstate settings, defined in XML.
+
+A material can define several techniques for different quality settings and LOD distances. A technique will further be split into several passes, which are explained below. The same materials will be used in all of forward, light prepass & deferred rendering; only the passes used will be different.
+
+Note that textures and shader parameters are defined on the technique level, while a pass defines the actual shaders and renderstates to use. This is to reduce duplication when writing the material descriptions.
+
+A material description can contain the following elements & attributes, most of them optional:
+
+{{{
+<material>
+    <base name="BaseMaterial.xml" />
+    <technique quality="q" loddistance="d" sm3="true|false" />
+        <texture unit="diffuse|normal|specular|emissive|detail|environment" name="Texture.dds" />
+        <parameter name="ShaderParameterName" value="x y z w" />
+        <pass name="deferred|emissive|prepass|material|ambient|negative|light|postopaque|shadow"
+            vs="VertexShaderName" ps="PixelShaderName" alphamask="true|false" 
+            alphatest="true|false" blend="replace|add|multiply|alpha|addalpha|premulalpha|invdestalpha" 
+            cull="none|ccw|cw" depthtest="always|equal|less|lessequal|greater|greaterequal" 
+            depthwrite="true|false" /> 
+    </technique>
+</material>
+}}}
+
+Technique quality is specified from 0 to 2 (low, medium, high.) A technique will only be used if the material quality level set in [Rendering Pipeline] is at least as high as the technique quality. If a technique specifies "true" for the sm3 attribute, it will only be used when Shader Model 3.0+ hardware is available.
+
+===Passes===
+
+Some passes are meaningful only in specific render modes, while others are relevant in all.
+
+For deferred rendering only:
+
+  * *Deferred* - rendering of opaque geometry diffuse albedo, normals and depth to the G-buffer.
+  * *Emissive* - additional rendering pass for emissive properties of objects, performed after light accumulation.
+  
+For light prepass rendering only:
+
+  * *Prepass* - rendering of opaque geometry normals and depth to the G-buffer.
+  * *Material* - rendering opaque geometry for the second time, using the light accumulation result.
+
+For forward rendering: (also available in deferred / light prepass, with limitations)
+
+  * *Ambient* - base pass for opaque or transparent geometry. This should also include any emissive properties.
+  * *Negative* - a darkening pass used for negative lights. Typically uses modulative blending.
+  * *Light* - additive pass for a single light. Shadows are applied for opaque objects only.
+
+For all rendering modes:
+
+  * *Postopaque* - a custom forward rendering pass that is performed after standard opaque geometry rendering, but before transparencies.
+  * *Shadow* - rendering to a shadow map. You could try specifying frontface culling to fight self-shadowing artifacts, instead of just depth bias.
+
+Default renderstates for a pass are: alpha masking and alpha testing disabled, replace blend mode, counterclockwise culling, depth test lessequal, and depth write enabled. Alpha masking is not an actual renderstate, but a hint telling that the shader is going to do discarding based on alpha, so that geometry with no alpha testing or masking can be rendered first.
+
+For forward rendering, it is important to distinguish between opaque and transparent geometry, as transparencies are rendered last, back to front. This is done by examining the blend mode of the ambient pass: if it's replace, then the geometry is interpreted as opaque, otherwise transparent.
+
+If a G-buffer pass is specified and deferred or light prepass rendering is in use, then ambient, negative & light passes will all be ignored.
+
+If a G-buffer or ambient pass is specified, the post-opaque pass will be ignored.
+
+It's legal to use forward shaded opaque materials also in deferred or light prepass mode, by not defining a G-buffer pass. However, shadows will not have effect, as shadow map data is no longer available after the deferred light accumulation.
+
+The post-opaque pass can be used to optimize skybox rendering, as the depth buffer has already been initialized with all opaque geometry at that point.
+
+===Technique order===
+
+For material distance LOD and material quality to work correctly, the material techniques have to appear in a specific order:
+
+  * Most distant & highest quality
+  * ...
+  * Most distant & lowest quality
+  * Second most distant & highest quality
+  * ...
+
+===Base materials===
+
+Using a base material simply means copying the techniques and passes from an existing material, then overwriting them selectively in the derived material. In case a base material defines a pass that the derived material does not need, it can be be disabled by specifying empty vertex and pixel shader names.

@@ -1,0 +1,5 @@
+Class that you derive from to be able to subscribe to & receive [EventSystem events].
+
+By default, the handleEvent() function dispatches events automatically to the proper handler function. For advanced use, you can override handleEvent().
+
+Note that all event subscribers are stored in EventListener static member variables; therefore no separate "event manager" object is required, but as a consequence the event subscribers are "global" to the whole program.

@@ -1,0 +1,3 @@
+Represents an [http://www.angelcode.com/angelscript AngelScript] script file. Is compiled upon loading into a script module so that functions and methods from within it can be executed.
+
+Note that the script file may include other script files, and these are also compiled into the same script module. The "root" script file, which decides the name of the script module, is the one on which the getResource() request is initially made. Each script module has its own class hierarchy, which is not usable from other script modules.

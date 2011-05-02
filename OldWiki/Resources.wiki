@@ -1,0 +1,24 @@
+Resources include most things in Urho3D that are loaded from mass storage during initialization or runtime:
+
+  * 3D models
+  * Animations
+  * [Material Materials]
+  * [Texture Textures]
+  * [Shader Shaders]
+  * Fonts
+  * [CollisionShape Physics collision shapes]
+  * [ScriptFile Script files]
+  * Sounds and music
+  * XML files
+
+They are managed and loaded by the resource cache, with the help of [ResourceFactory resource factories].
+
+Each resource type has an unique integer ID, which is the string hash of the resource type name (use the function getTypeStatic() of the resource class to get it.) Resources can be loaded either from the file system or from [PackageTool packages]. If a resource is not found or fails to load, a null pointer will be returned.
+
+Typical example of requesting a resource from the cache, in this case, a texture for a UI element. Note the use of a convenience template argument to specify the resource type, instead of using the type ID:
+
+{{{
+healthBar->setTexture(mCache->getResource<Texture2D>("Textures/HealthBarBorder.png"));
+}}}
+
+Resources can also be created manually and stored to the cache as if they had been loaded from disk.

@@ -1,0 +1,57 @@
+A [SceneNode scene node] that describes how to illuminate the actual geometry. Derives from [VolumeNode].
+
+Lights in Urho3D can be directional, spot, or point lights. Shadow mapping is supported for all light types.
+
+A directional light's position has no effect, as it's assumed to be infinitely far away, only its rotation matters. It casts orthographically projected shadows. For increasing the shadow quality, cascaded shadow mapping (splitting the view into several shadow maps along the Z-axis) can be used.
+
+Spot lights use both direction and rotation. In addition they have FOV & aspect ratio values like cameras to define the shape of the light cone.
+
+Point lights are spherical in shape. When a point light casts shadows, it will be internally split into 6 spot lights with a 90 degree FOV each. This is very expensive rendering-wise, so shadow casting point lights should be used sparingly.
+
+Both spot and point lights use an attenuation ramp texture to determine how the intensity varies with distance. In addition they have a shape texture, 2D for spot lights, and an optional cube texture for point lights. It is important that the spot light's shape texture has black at the borders, and has mipmapping disabled, otherwise there will be "bleeding" artifacts at the edges of the light cone.
+
+===Shadow parameters===
+
+Shadow rendering is easily the most complex aspect of using lights, and therefore a wide range of parameters exists for controlling the shadows:
+
+  * *Depth bias parameters*. Defines constant and slope-scaled depth bias values for preventing self-shadowing artifacts. In practice, need to be determined experimentally. Also, these can be wildly different for orthographic (directional) and projective (point and spot) shadows. Another way of fighting self-shadowing issues is to render shadowcaster backfaces, see [Material materials].
+
+  * *Cascade parameters*. These have effect only for directional lights, and they consist of the number of splits, split lambda parameter, split fade range, and shadow maximum range. Lambda is between 0.0 - 1.0. Higher values create more high-resolution splits near the viewer. Split fade range determines to what degree the splits overlap, creating a smooth fade effect. For example fade range of 0.1 would use 10% of the full depth range to fade each split to the next. Geometry beyond shadow maximum range will be unshadowed (practically, an extra unshadowed split will be rendered, if maximum range is less than the far clip distance.)
+
+  * *Focus parameters*. These have effect for directional and spot lights, and control techniques to increase shadow map resolution. They consist of focus enable flag (allows focusing the shadow camera on the visible shadow casters & receivers), nonuniform scale enable flag (allows better resolution), out-zooming enable flag (reduces fillrate of distant spot lights by not using the whole shadow map when not necessary), and quantization & minimum size parameters for the shadow camera view.
+
+Additionally, there exist shadow fade distance, shadow intensity, shadow resolution and shadow near/far ratio parameters:
+
+  * If both shadow distance and shadow fade distance are greater than zero, shadows start to fade at the shadow fade distance, and vanish completely at the shadow distance.
+  
+  * Shadow intensity defines how dark the shadows are, between 0.0 (maximum darkness, the default) and 1.0 (fully lit.)
+
+  * The shadow resolution parameter allows choosing between a fullsize (1.0), half-size (0.5) and quarter-size (0.25) shadow map. Choose according to the size and importance of the light; smaller shadow maps will be much less performance hungry.
+
+  * The shadow near/far ratio controls shadow camera near clip distance for point & spot lights. The default ratio is 0.002, which means a light with range 100 would have its shadow camera near plane set at the distance of 0.2. Set this as high as you can for better shadow depth resolution, but note that the bias parameters will likely have to be adjusted as well.
+
+===Negative lights===
+
+Negative lights are a special case of lights that can be used to reduce the ambient light level locally, to implement for example a dark cave. To use, simply set a color with negative red, green and blue components. These can never be shadow-casting.
+
+===Light detail levels===
+
+Lighting a complex scene, especially with shadows, demands a lot from the GPU. Light & [Rendering Pipeline] together provide a scalability setting for lighting. Each light defines a detail level and shadow detail level, and these are compared against the Pipeline's light detail level. The light is only rendered if its detail level is lower than or equal to Pipeline's, and only casts shadows if the light's shadow detail level is lower or equal. By default lights have the lowest possible detail level (0), meaning they will be rendered regardless of the Pipeline's setting.
+
+For example player characters' dynamic gun muzzle flash effects could have three levels of detail with this system:
+
+  * Low: do not render dynamic muzzle flashes.
+  * Medium: render muzzle flashes unshadowed.
+  * High: render muzzle flashes with shadows.
+
+Light detail levels can also be used to adjust for the performance difference between forward & deferred rendering: by defining less important lights with a high detail level, and setting the Pipeline's detail level high when using deferred and lower when using forward, one can in effect create "deferred rendering only" -lights.
+
+===Light culling===
+
+When occlusion is used, a light will automatically be culled if its bounding box is fully behind an occluder. However, directional lights have an infinite bounding box, and can not be culled this way.
+
+In forward rendering, it is possible to limit which objects are affected by a light, by setting a "lightmask" on both the light and the objects. The lightmasks of the light and objects are ANDed to check whether the light should have effect: the light will only illuminate an object if the result is nonzero. By default objects and lights have all bits set in their lightmask, thus passing this test always.
+
+[Zone Zones] can also be used for light culling in a similar manner. The lightmask of the zone the camera is in will be ANDed with each light's lightmask to see whether the light should be included in rendering. This method of light culling works equally in deferred and forward rendering. By default a zone has all bits set in its lightmask.
+
+Care must be utilized when doing light culling with lightmasks, because they easily create situations where a light's influence is cut off unnaturally. However, they can be a great performance boost: for example if you imagine a multi-store building with lights, lights would normally need to have shadows enabled to not "bleed" into the lower floors, which would cost performance. The bleeding could also be prevented by using unique lightmask bits on the objects and lights of each floor.

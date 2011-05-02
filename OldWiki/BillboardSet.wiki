@@ -1,0 +1,10 @@
+A [SceneNode scene node] which derives from [GeometryNode] to implement billboard rendering required for example for particle systems. The billboards will always face the camera, and will all use the same material, but can specify individual positions, rotations and 2D sizes.
+
+Similar to InstancedModel, there is an API to manage the individual billboards. Note that changing the number of billboards is an expensive operation; it's more efficient to reserve a fixed number of billboards, and then enable or disable them as needed. Billboards can be relative either to the BillboardSet's transform, or to the world space.
+
+  * setNumBillboards() - set number of billboards
+  * setBillboardsRelative() - set whether billboards are relative to the BillboardSet, default true.
+  * setBillboardsSorted() - set whether billboards are sorted according to distance. This is an expensive operation, but necessary for correct look of alpha blended billboards.
+  * getBillboard() - get pointer to an individual billboard with a 0-based index
+  * getBillboards() - get a vector of all billboards you can modify
+  * updated() - call when you are finished with billboard update. The billboards will show on the next rendered frame.

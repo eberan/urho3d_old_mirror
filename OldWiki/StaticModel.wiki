@@ -1,0 +1,3 @@
+A [SceneNode scene node] that derives from [GeometryNode] to implement a static model, that can consist of multiple batches, and can do geometry LOD transitions, but does not animate otherwise.
+
+Is a useful starting point for custom renderables that do not need to go as deep as to derive from [GeometryNode] themselves. For example [Skybox] derives from this.

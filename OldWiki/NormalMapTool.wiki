@@ -1,0 +1,13 @@
+NormalMapTool converts normal map images into DXT5 format, with an encoding that preserves quality better than simply compressing the original, unmodified image. The encoding is:
+
+  * X axis (red in the original normal map) goes into the alpha channel
+  * Y axis (green in the original normal map) goes into the color channels
+  * Z axis will be reconstructed in the pixel shader
+
+Usage:
+
+{{{
+NormalMapTool <input image file>
+}}}
+
+The texconv tool from the DirectX SDK needs to be available through the system PATH.

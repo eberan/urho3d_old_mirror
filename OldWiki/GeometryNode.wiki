@@ -1,0 +1,17 @@
+A [SceneNode scene node] that can provide information of the geometry it wants to render to the [Rendering Pipeline], in the form of one or several rendering operations or batches.
+
+If you want to create a custom renderable scene node, subclassing GeometryNode directly allows for the most flexibility.
+
+The important functions you need to implement:
+
+  * updateGeometry(). Called when it is known for sure that the node will be rendered this frame. Here you can ensure that your geometry looks like it should (animation, vertex/index buffer updating & such.)
+
+  * getGeometryType(). Returns which kind of vertex shader should be used in rendering. The current types are static, skinned and instanced. Static is the default.
+
+  * getNumBatches(). Returns the number of batches the node wishes to utilize for rendering.
+
+  * getBatchGeometry(). Returns the [Geometry] object used for a certain batch index. If you use geometry LOD, you have to return the correct LOD level geometry here.
+
+  * getBatchMaterial(). Returns the [Material material] used for a certain batch index. Note that [Rendering Pipeline] handles material LOD, or choosing the correct material technique, on its own.
+
+Optionally, implement the function getVertexShaderParameter() if you need to provide vertex shader constant data for rendering. For example AnimatedModel uses this to provide the skinning data.

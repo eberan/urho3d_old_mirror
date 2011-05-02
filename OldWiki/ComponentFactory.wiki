@@ -1,0 +1,5 @@
+An object that instantiates a new component given a component type ID, and returns the pointer to it. Or, if it does not know how to instantiate that particular component, returns a null pointer.
+
+To be able to instantiate a given component, references to certain subsystems may be needed. The ComponentFactory is a good place to "hide" those references, instead of having to look them up each time when creating a component manually.
+
+When you define your own components, define also a corresponding ComponentFactory, then register it with your [Scene].

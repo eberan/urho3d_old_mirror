@@ -1,0 +1,1 @@
+A [SceneNode scene node] that holds skinning information (the bindInverseTransform matrix) in addition to the usual transform, and can be reset to an initial state before applying animation each frame. Usually exists within a [Skeleton].

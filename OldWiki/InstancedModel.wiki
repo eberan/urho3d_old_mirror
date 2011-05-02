@@ -1,0 +1,11 @@
+A [SceneNode scene node] that derives from [GeometryNode] to implement instanced static model rendering. The internal functions needed for this are much different from [StaticModel], and therefore its code is not reused.
+
+InstancedModel supports both vertex shader constant based instancing, and true hardware instancing that uses a second vertex stream. The latter is only supported on Shader Model 3.0+.
+
+There is an API which allows to manage the individual instances. They all will use the same material(s), but can define individual transforms. The instance transforms can be specified either relative to the InstancedModel's transform, or to the world space.
+
+  * setNumInstances() - set number of instances
+  * setInstancesRelative() - set whether instances are relative to the InstancedModel, default true.
+  * getInstance() - get pointer to an individual instance by 0-based index
+  * getInstances() - get a vector of all instances that you can modify
+  * updated() - call this after you are done with instance transform updates: will make the instances visible on the next rendered frame.

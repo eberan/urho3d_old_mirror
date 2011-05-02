@@ -1,0 +1,1 @@
+Base class for objects which can be pointed to by SharedPtr and WeakPtr. Implements intrusive reference counting. Classes that derive from this also become noncopyable, as the assignment and copy constructor operations have been declared private.

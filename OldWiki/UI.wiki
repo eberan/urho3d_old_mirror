@@ -1,0 +1,245 @@
+Urho3D implements a simple, hierarchical user interface system based on rectangular UI elements. The UI elements provided by default are:
+
+  * BorderImage: a texture image with an optional border
+  * Button: a pushbutton
+  * CheckBox: a button that can be toggled on/off
+  * Cursor: a mouse cursor
+  * DropDownList: shows a vertical list of items (optionally scrollable) as a popup
+  * LineEdit: a single-line text editor
+  * ListView: shows a scrollable vertical list of items
+  * Menu: a button which can show a popup element
+  * ScrollBar: a slider with back and forward buttons
+  * ScrollView: a scrollable view of child elements
+  * Slider: a horizontal or vertical slider bar
+  * Text: static text that can be multiline
+  * UIElement: container for other elements, renders nothing by itself
+  * Window: a movable and resizable window
+
+The [Engine] creates the UI subsystem on initialization. From the UI subsystem you can query the root UI element, which is an empty canvas (UIElement), as large as the rendering window, into which other elements can be added.
+
+Elements are added into each other similarly as [SceneNode scene nodes], using the addChild() and removeChild() functions.
+
+===Defining UI elements in XML===
+
+Each UI element knows to load its properties from an XML file. There are two distinct use cases for this: either defining just the UI element style and leaving the actual position and dimensions to be filled in later, or fully defining a set of UI elements. For an example of defining element styles, see the file Data/UI/DefaultStyle.xml.
+
+The function loadLayout() in UI will take an XML file and instantiate the elements defined in it. To be valid XML, there should be one root UI element. An optional style XML file can be specified; the idea is to first read the element's style from that file, then fill in the rest from the actual layout XML file. This way the layout file can be relatively simple, as the majority of the data is already defined. See the Data/UI folder for test layouts, which all assume that Data/UI/DefaultStyle.xml is used as the style file.
+
+The XML data for each UI element follows. Everything is optional and defaults will be used if missing. Note the redundant ways in which to define element size. Also note the element class hierarchy; for example a Button derives from BorderImage, and all elements derive from UIElement. See the comments in the elements' header files for descriptions of each property.
+
+===Basic elements===
+
+====UIElement====
+
+{{{
+<element name="element name" >
+    <position value="x y" />
+    <size value="x y" />
+    <width value="x" />
+    <height value="y" />
+    <minsize value="x y" />
+    <minwidth value="x" />
+    <minheight value="y" />
+    <maxsize value="x y" />
+    <maxwidth value="x" />
+    <maxheight value="y" />
+    <fixedsize value="x y" />
+    <fixedwidth value="x" />
+    <fixedheight value="y" />
+    <alignment horizontal="left|center|right" vertical="top|center|bottom" />
+    <clipborder value="l t r b" />
+    <priority value="p" />
+    <opacity value="o" />
+    <color value="r g b a" | topleft="r g b a" topright="r g b a" bottomleft="r g b a" bottomright="r g b a" />
+    <bringtofront enable="true|false" />
+    <bringtoback enable="true|false" />
+    <clipchildren enable="true|false" />
+    <enabled enable="true|false" />
+    <selected enable="true|false" />
+    <visible enable="true|false" />
+    <focusmode value="notfocusable|resetfocus|focusable|focusabledefocusable" />
+    <layout mode="free|horizontal|vertical" spacing="s" border="l t r b" />
+    <userdata>
+        <variant name="n" type="t" value="v" />
+        ...
+    </userdata>
+</element>
+}}}
+
+====BorderImage====
+
+{{{
+<element>
+    <texture name="texture.png" />
+    <imagerect value="l t r b" />
+    <border value="l t r b" />
+    <hoveroffset value="x y" />
+</element>
+}}}
+
+====Button====
+
+{{{
+<element>
+    <pressedoffset value="x y" />
+    <labeloffset value="x y" />
+    <repeat delay="d" rate="r" />
+</element>
+}}}
+
+====CheckBox====
+
+{{{
+<element>
+    <checkedoffset value="x y" />
+</element>
+}}}
+
+====Cursor====
+
+{{{
+<element>
+    <shape name="normal|resizevertical|resizediagonal_topright|resizehorizontal|resizediagonal_topleft|acceptdrop|rejectdrop"
+        texture="texture.png" imagerect="l t r b" hotspot="x y" />
+    ...
+</element>
+}}}
+
+====Menu====
+
+If a popup element is specified, it will be searched for by name from the UI element hierarchy.
+
+{{{
+<element>
+    <popup name="search name" />
+    <popupoffset value="x y" />
+</element>
+}}}
+
+====Text====
+
+{{{
+<element>
+    <font name="font.ttf" size="s" />
+    <text value="text here" />
+    <textalignment value="left|center|right" />
+    <rowspacing value="s" />
+    <selection start="s" length="l" />
+    <selectioncolor value="r g b a" />
+    <hovercolor value="r g b a" />
+</element>
+}}}
+
+====Window====
+
+{{{
+<element>
+    <resizeborder value="l t r b" />
+    <movable enable="true|false" />
+    <resizable enable="true|false" />
+</element>
+}}}
+
+===Composite and derived elements===
+
+====DropDownList====
+
+The styles of the listview, popup and placeholder sub-elements can be specified within the respective XML elements. The listview can be pre-filled by specifying popup items; they will be searched for by name from the UI element hierarchy.
+
+{{{
+<element>
+    <selection value="s" />
+    <resizepopup enable="true|false" />
+    <listview />
+    <popup />
+    <placeholder />
+    <popupitem name="search name" />
+    ...
+</element>
+}}}
+
+====LineEdit====
+
+The style of the cursor sub-element can specified with the "cursor" XML element.
+{{{
+<element>
+    <maxlength value="l" />
+    <cursormovable enable="true|false" />
+    <textselectable enable="true|false" />
+    <textcopyable enable="true|false" />
+    <text value="initial text here" />
+    <cursorposition value="p" />
+    <cursorblinkrate value="r" />
+    <echocharacter value="c" />
+    <cursor />
+</element>
+}}}
+
+====Slider====
+
+The style of the knob sub-element can specified with the "knob" XML element.
+
+{{{
+<element>
+    <orientation value="horizontal|vertical" />
+    <range max="m" value="v" />
+    <knob />
+</element>
+}}}
+
+====ScrollBar====
+
+The styles of the back button, forward button and the slider can be specified with the respective XML elements. Note the buttons' nonstandard imagerect element, which specifies the image to use for both a horizontal and a vertical button.
+
+{{{
+<element>
+    <orientation value="horizontal|vertical" />
+    <range max="m" value="v" />
+    <scrollstep value="s" />
+    <stepfactor value="f" />
+    <backbutton>
+        <imagerect horizontal="l t r b" vertical="l t r b" />
+    </backbutton>
+    <forwardbutton>
+        <imagerect horizontal="l t r b" vertical="l t r b" />
+    </forwardbutton>
+    <slider />
+</element>
+}}}
+
+====ScrollView====
+
+The styles of the horizontal and vertical scrollbars can be specified with the respective XML elements. If a content element is specified, it will be searched for by name from the UI element hierarchy.
+
+{{{
+<element>
+    <viewposition value="x y" />
+    <scrollstep value="s" />
+    <pagestep value="p" />
+    <horizontalscrollbar />
+    <verticalscrollbar />
+    <contentelement name="search name" />
+</element>
+}}}
+
+====ListView====
+
+{{{
+<element>
+    <selection value="s" />
+    <highlight value="never|focus|always" />
+    <multiselect enable="true|false" />
+    <hierarchy enable="true|false" />
+    <clearselection enable="true|false" />
+    <doubleclickinterval value="i" />
+
+</element>
+}}}
+
+===Automatic layout of elements===
+
+By default UI elements operate in a "free" layout mode, where child elements' positions can be specified relative to any of the parent element corners, but they are not automatically positioned or resized.
+
+To create automatically adjusting layouts, the layout mode can be switched to either "horizontal" or "vertical". Now the child elements will be positioned left to right or top to bottom, based on the order in which they were added. They will be preferably resized to fit the parent element, taking into account their minimum and maximum sizes, but failing to do that, the parent element will be resized.
+
+Left, top, right & bottom border widths and spacing between elements can also be specified for the layout. A grid layout is not directly supported, but it can be manually created with a horizontal layout inside a vertical layout, or vice versa.

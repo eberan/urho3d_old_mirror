@@ -1,0 +1,1 @@
+This is not an inbuilt [Scene component] of the Urho3D engine, but is a base class for game logic components in the NinjaSnowWar example. The ninja, snowball, crate, and healing potion subclass from this. These implement "game-like" concepts like a per-frame (fixed timestep) logic update, and taking & giving damage.

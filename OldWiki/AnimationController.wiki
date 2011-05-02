@@ -1,0 +1,3 @@
+A [Scene component] which can drive the animations of an AnimatedModel automatically during the scene update. This includes speed control, automatic fade in & out, and dividing animations into groups to control for example the movement and attack animations of a character separately.
+
+Note that in networked use, the AnimationController only needs to be replicated for client-side prediction of the client's controlled character, as AnimatedModel itself already fully synchronizes the animation state over the network.

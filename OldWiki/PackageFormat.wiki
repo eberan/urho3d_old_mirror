@@ -1,0 +1,11 @@
+{{{
+byte[4]    Identifier UPAK
+uint       Number of files in the package
+uint       Checksum of all the files combined 
+
+  For each file:
+  cstring    File path and name (for example Textures/RampWide.png)
+  uint       Offset from start of package to file start
+  uint       File size
+  uint       Checksum
+}}}

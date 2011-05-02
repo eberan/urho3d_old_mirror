@@ -1,0 +1,19 @@
+Tool that loads [http://www.ogre3d.org OGRE] .mesh.xml and .skeleton.xml files and saves them as Urho3D .mdl (model) and .ani (animation) files. For other 3D formats and whole scene importing, see AssetImporter instead. However that tool does not handle the OGRE formats as completely as this.
+
+Usage:
+
+{{{
+OgreImporter <input file> <output file> [options]
+
+Options:
+-a   Export animations
+-lcX Use LOD level X for collision mesh, default is middle LOD
+-lrX Use LOD level X for raycasts, default is same as visible LOD
+-loX Use LOD level X for occlusion, default is same as visible LOD
+-m   Export morphs
+-r   Export only rotations from animations
+-s   Split each submesh into own vertex buffer
+-t   Generate tangents
+}}}
+
+Note: exporting only bone rotations may help when using an animation in a different model, but if bone position changes have been used for effect, the animation may become less lively. Unpredictable mutilations might result from using an animation in a model not originally intended for, as Urho3D does not specifically attempt to retarget animations.

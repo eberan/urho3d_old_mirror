@@ -1,0 +1,5 @@
+The SourceAssets directory in Urho3D contains assets that need compilation before they can be utilized during runtime.
+
+Currently, this means models and HLSL shaders. The OgreImporter and ShaderCompiler tools are used for the process.
+
+[http://www.cmake.org cmake] build scripts are provided to compile the example assets; either expand those build scripts for your own assets, or create an alternative way for compiling them (such as straightforward batch files.)

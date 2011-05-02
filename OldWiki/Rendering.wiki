@@ -1,0 +1,72 @@
+Much of the rendering functionality in Urho3D is built on two classes, Renderer and Pipeline, contained within the Renderer library.
+
+===Renderer===
+
+Renderer implements the low-level functionality:
+
+  * Creating the window and the Direct3D device
+  * Setting the screen mode
+  * Keeping track of GPU resources
+  * Keeping track of Direct3D state (current rendertarget, vertex and index buffers, textures, shaders and renderstates)
+  * Handling lost device
+  * Performing primitive rendering operations
+
+It also provides a low-performance, immediate-like interface for manually defining small amounts of geometry to be rendered. By default, this interface is used for rendering the debug geometry and the user interface.
+
+Screen resolution, fullscreen/windowed, vertical sync, deferred/forward mode, and hardware multisampling level are all set at once by calling Renderer's setMode() function. Multisampling will be disabled in deferred rendering mode, as those are incompatible.
+
+When setting the initial screen mode, Renderer does a few checks:
+
+  * Which shader model is supported? 2.0 is minimum, but 3.0 will be used if available. Shader model 2.0 can be forced by calling setForceSM2() before calling setMode() for the first time.
+  * Are multiple render targets supported? If not, only forward rendering will be available.
+  * Are hardware shadow maps supported? Both ATI & NVIDIA style shadow maps can be used. If neither are available, shadow rendering will be disabled.
+  * Is a hardware depth buffer (INTZ format) supported? If yes, there is no need to render to a third rendertarget during G-buffer creation. However, the hardware depth buffer will not be utilized on ATI GPUs on Windows Vista/Windows 7 because of performance degradation when using it for both depth testing & texture sampling at the same time.
+
+===Pipeline===
+
+Pipeline can be thought of as the "high-level renderer," which implements rendering the 3D scene each frame. To do this, it needs a [Scene] with an [Octree] and a [Camera]. The octree stores all visible scene nodes to allow querying for them in an accelerated manner. Note that only scene nodes with immediate rendering significance are stored to the octree. For example skeleton bones and physics rigid bodies are not.
+
+Pipeline can use either forward rendering, light prepass, or full deferred rendering to render opaque geometry, while transparent objects will always be rendered using forward rendering. Unlike Renderer, Pipeline understands [Material materials]; all rendering of the 3D scene objects happens using them.
+
+===Scene rendering and viewports===
+
+The scene, camera and screen rectangle to use are set with Pipeline's setViewport() function. By default there is one viewport, but the amount can be increased with the function setNumViewports(). The viewport(s) should cover the entire screen or otherwise hall-of-mirrors artifacts may occur. By specifying a zero screen rectangle the whole window will be used automatically. The viewports will be rendered in ascending order, so if you want for example to have a small overlay window on top of the main viewport, use viewport index 0 for the main view, and 1 for the overlay.
+
+The steps for rendering each frame are roughly the following:
+
+  * Query the octree for visible geometries and lights in the camera's view frustum.
+  * Optimize the visible objects using software rasterized occlusion (can be switched off if this sounds scary and time-wasting, but practically it allows for a huge performance increase in more complex & occluded scenes.)
+  * Check the influence of each visible light on the geometries. If the light casts shadows, query the octree for shadowcaster geometries.
+  * Construct render operations (batches) from the visible objects.
+  * Perform these render operations during the rendering step at the end of the frame.
+
+If there are multiple viewports or [AuxiliaryViews auxiliary views], these steps are repeated for each.
+
+The rendering operations are divided into passes in the following order:
+
+  * Opaque geometry ambient pass (forward) or filling the G-buffer with opaque geometry (light prepass & deferred.)
+  * Negative light pass. This subtracts from the ambient light level.
+  * Lighting opaque geometry. For each shadow-casting light, the shadow map is rendered first (note that shadow maps are re-used.) This phase is the biggest difference between forward, light prepass & deferred rendering paths, see [ForwardVsDeferred details].
+  * Post-opaque rendering pass for materials that define that.
+  * Transparent geometry rendering pass. Transparent, alpha-blended objects are sorted according to distance and rendered back-to-front to ensure correct blending. 
+
+===Scene nodes===
+
+The [SceneNode scene nodes] defined by the Renderer library are:
+
+  * [Camera]. Describes a viewpoint for rendering, including projection parameters (FOV, near/far distance, perspective/orthographic)
+  * [VolumeNode]. All nodes stored to the [Octree] derive from this. Not directly used.
+  * [GeometryNode]. All nodes that have renderable geometry derive from this. Not directly used.
+  * [StaticModel]. Geometry that does not animate, but can LOD transition according to distance.
+  * [AnimatedModel]. Geometry that can do skeletal or vertex morph animation.
+  * [InstancedModel]. Static geometry of which many copies can be rendered efficiently. Could be used for forests etc.
+  * [Skybox]. Static geometry that disregards the camera's position and thus appears to extend infinitely far away
+  * [BillboardSet]. Implements a group of camera-facing billboards, which can have varying size and rotation.
+  * [CustomObject]. Implements user-definable geometry.
+  * [Light]. Can be either a directional, point, or spot light. Can optionally cast shadows.
+  * [Bone]. Used for skeletal animation. Note that objects can be attached to these, like to any scene node.
+  * [Zone]. Defines global properties like fogging and background color, based on the zone the camera is currently in.
+
+Note that none of these scene nodes animate by themselves; they are only concerned of rendering their current state as efficiently as possible. As somewhat of a half-way exception, AnimatedModel and BillboardSet understand the passage of time for animation LOD purposes, but still need outside invocation to actually change their state.
+
+Subclassing the scene nodes is recommended, for example ParticleEmitter in the Engine library subclasses BillboardSet to create an automatically animating particle system.

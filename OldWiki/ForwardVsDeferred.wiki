@@ -1,0 +1,34 @@
+Urho3D implements three major variations of lighting geometries per-pixel: multipass forward, light prepass, and deferred rendering.
+
+===Multipass forward===
+
+Multipass forward rendering is used when light prepass or deferred rendering is not chosen or not available, or when rendering transparent objects. Each pass redraws the lit geometry, additively blending the contribution of a single light. Multiple lights per pass are not used to not explode the shader permutation count, and to not go over shader model 2.0 instruction limits. Scissor optimization is used to reduce pixel count in case of small lights / large geometries.
+
+===Light prepass===
+
+Light prepass creates the following lightweight G-buffer, using 1 or 2 render targets:
+
+  * World-space normal and specular power (D3DFMT_A8R8G8B8)
+  * Linear depth (D3DFMT_R32F) if hardware INTZ depth is not available
+
+The normals, specular power and depth of opaque objects are rendered first to the G-buffer. After this, a D3DFMT_A8R8G8B8 light accumulation buffer is initialized with the ambient color, and light volumes are rendered to it with additive blending, using stencil masking to optimize the light volume depth range if possible. The diffuse light color is rendered to the RGB channels, and monochromatic specular intensity is rendered to the A channel. Only half the intensity of lights is used to allow up to 2x "overburn" for the total accumulated lighting.
+
+When the light accumulation buffer is ready, opaque objects are rendered for the second time (the "material" pass), using the light accumulation buffer to calculate diffuse and specular lighting. The color of specular lighting is resolved by modulating the monochromatic specular intensity with the diffuse light color. This will not result in correct specular lighting when multiple lights combine, but is a reasonable approximation in most cases. Emissive and environment mapping effects can be added during the material pass.
+
+===Deferred rendering===
+
+Deferred rendering creates the following G-buffer, using 2 or 3 render targets:
+
+  * Diffuse albedo and specular intensity (D3DFMT_A8R8G8B8)
+  * World-space normal and specular power (D3DFMT_A8R8G8B8)
+  * Linear depth (D3DFMT_R32F) if hardware INTZ depth is not available
+
+Opaque objects are rendered to the G-buffer first, then an initial full-screen quad is drawn to initialize the backbuffer, using the G-buffer information to blend between ambient lighting and fog color. After this, light volumes are rendered with additive blending, and using stencil masking to optimize the light volume depth range if possible.
+
+After light accumulation, emissive properties of materials as well as effects like environment mapping need to be rendered in an additional "emissive" pass for objects that need them.
+
+===Comparision===
+
+Deferred rendering will win particularly in vertex-heavy scenes, as the actual geometries need to be rendered only once. However, in simple scenes the cost of filling the G-buffer may be substantial and outweight the benefit. Light prepass does not consume as much texture sampling bandwidth when accumulating the lighting, so it may have a performance advantage over deferred when the lighting environment is complex. In the simplest scenes, forward rendering can still be assumed to be fastest.
+
+Note that with the current G-buffer format, it's not possible to specify a material's specular color, only the specular intensity. The default forward rendering shaders have also been written in the same way to match the output of the deferred rendering, but more material variety could in fact be achieved with forward-shaded materials, or with the material pass of light prepass rendering.

@@ -1,0 +1,1 @@
+A sound channel in the [Audio] subsystem that is also a [SceneNode scene node] to implement 3D audio playback.

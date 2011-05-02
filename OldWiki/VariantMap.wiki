@@ -1,0 +1,21 @@
+VariantMap is a structure that can be used to define, pass around, and serialize/deserialize freeform data. [Scene Entities] use it for their properties, and [EventSystem events] use it for event parameters.
+
+The keys are 16-bit short string hashes of the parameter names; static const short hashes that are calculated during program static initialization can be defined with the help of the DEFINE_SHORT_HASH macro in StringHash.h. The values are Variants, with the following supported data types:
+
+  * int
+  * bool
+  * float
+  * Vector2
+  * Vector3
+  * Vector4
+  * Quaternion
+  * Color
+  * String (std::string)
+  * Buffer (std::vector`<`unsigned char`>`)
+  * Pointer (void`*`)
+  * VariantVector (std::vector`<`Variant`>`)
+  * VariantMap (std::map`<`ShortStringHash, Variant`>`)
+
+When assigning, any of those types can be used; the Variant's type will be set accordingly. To access the value, type-specific functions are needed (getInt(), getBool() etc.) The type can be inspected beforehand; trying to get a mismatched type results in an empty, false or zero value as applicable. String hashes and short string hashes can also be stored; they will be converted to an int.
+
+When VariantMaps are serialized or deserialized, such as for sending remote events or saving/loading a scene, any pointers are converted to null for safety, and a warning is logged.

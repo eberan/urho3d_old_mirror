@@ -1,0 +1,7 @@
+A "box" that divides space recursively (along the X, Y & Z axes) into smaller boxes or octants, until a certain subdivision depth has been reached. Each octant stores a list of objects contained within for accelerated scene queries.
+
+In Urho3D, only scene nodes with immediate rendering significance are stored in the octree. They all derive from the class VolumeNode. These include [Light lights], [GeometryNode geometry objects], and [Zone zones] which define global scene rendering parameters.
+
+The octree has an update function, which is called by [Rendering Pipeline] each frame. During the update, all "dirtied" volume nodes (nodes that have changed transform or the size of their bounding box) are checked, if they need to be moved to a different octant. Nodes can also perform update logic before the reinsertion.
+
+Unlike [Scene], the octree does not own the scene nodes or "keep them alive" via a shared pointer, it simply stores raw pointers to them. The nodes will notify the octree at deletion time, to ensure a deleted node will not be stored or be attempted to be updated.

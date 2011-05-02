@@ -1,0 +1,21 @@
+Urho3D supports serialization of [Scene scenes] in both binary & XML format. To use, call the scene's save(), saveXML(), load() or loadXML() functions as necessary.
+
+The data saved is the following:
+
+  * Scene name
+  * Octree configuration (dimensions and number of splits)
+  * Physics world properties (gravity, simulation FPS, other simulation parameters)
+  * Interpolation properties for network client operation
+  * For each entity: ID & name, properties, and components
+
+To support the arbitrary data contained within components, each component must also implement the four functions listed above. For binary save/load they get a reference to a Serializer or a Deserializer; for XML save/load they get an XML element representing the component.
+
+As with [Network network serialization], studying how [SceneNode Node] loads and saves itself provides a relatively simple example: only the position, rotation, scale and parent node reference are stored.
+
+If you derive from an existing component, it's usually a good idea to call the base class save() and load() functions. In the very least Component::save() or Component::load() should be called, as these handle storing and restoring the component's type, name and netflags.
+
+Note that during loading, the components always have access to the resource cache to load any [Resources resources] they need.
+
+===Post-loading===
+
+When components depend on other entities or components, resolving these dependencies must be postponed until the scene is fully loaded. For this reason, the components can also implement the postLoad() function. An example of such dependency is the scene node component's parent node.

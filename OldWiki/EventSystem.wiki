@@ -1,0 +1,62 @@
+The Event system in Urho3D provides a straightforward means to send information either as a broadcast, or to a selected receiver.
+
+An event is defined with an unsigned 32-bit string hash of its name, and a VariantMap for event parameters. The parameters are identified by 16-bit short string hashes of their names. There are helper macros DEFINE_EVENT and EVENT_PARAM to define the needed hashes as statically initialized constants, more on this below.
+
+To be able to send and receive events, derive from EventListener.
+
+You also need to subscribe to the event(s) before receiving them. When you subscribe, you define an event handler function to the event in question. There is a macro EVENT_HANDLER that aids in this. In most cases it is convenient to define a different handler function for each event type, but sometimes it might also be useful to handle many events with the same function; both approaches are possible.
+
+For an example, here is how the mouse move event is defined in InputEvents.h:
+
+{{{
+DEFINE_EVENT(EVENT_MOUSEMOVE, MouseMove)
+{
+    EVENT_PARAM(P_X, X);                        // int
+    EVENT_PARAM(P_Y, Y);                        // int
+    EVENT_PARAM(P_BUTTONS, Buttons);            // int
+}
+}}}
+
+This initializes a static const event type hash EVENT_MOUSEMOVE from the string "MouseMove", and the parameter hashes P_X, P_Y and P_BUTTONS from the strings "X", "Y" and "Buttons" respectively. The hashes are calculated at startup, later there will be no runtime cost to using them. The variant types actually used by the parameters are simply put as comments.
+
+Here is the input subsystem sending the mouse movement event. Note the using directive: by default the helper macros put the event parameter hashes inside a namespace, which has the same name as the event.
+
+{{{
+using namespace MouseMove;
+        
+VariantMap eventData;
+eventData[P_X] = mMouseMoveX;
+eventData[P_Y] = mMouseMoveY;
+eventData[P_BUTTONS] = mMouseButtonDown;
+eventData[P_QUALIFIERS] = getQualifiers();
+sendEvent(EVENT_MOUSEMOVE, eventData);
+}}}
+
+A class called MyApplication subscribing to the event. Because a C++ member function pointer is being used, the class name also has to be supplied to the EVENT_HANDLER macro:
+
+{{{
+subscribeToEvent(EVENT_MOUSEMOVE, EVENT_HANDLER(MyApplication, handleMouseMove));
+}}}
+
+Alternatively it is also possible to subscribe only to the event of a specific sender. This would accomplish the same as above, but specify that the event must come from the input subsystem:
+
+{{{
+subscribeToEvent(mEngine->getInput(), EVENT_MOUSEMOVE, EVENT_HANDLER(MyApplication, handleMouseMove));
+}}}
+
+And finally, the event handler code could look like this:
+
+{{{
+void MyApplication::handleMouseMove(StringHash eventType, VariantMap& eventData)
+{
+    using namespace MouseMove;
+    
+    if (eventData[P_BUTTONS].getInt() & MOUSEB_RIGHT)
+    {
+        int mousedx = eventData[P_X].getInt();
+        int mousedy = eventData[P_Y].getInt();
+        
+        ...
+    }
+}
+}}}

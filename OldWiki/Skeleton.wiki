@@ -1,0 +1,1 @@
+A hierarchical collection of named [Bone bones]. Defined by a Model resource, and then cloned into each [AnimatedModel] instance using that model, for applying individual animation.

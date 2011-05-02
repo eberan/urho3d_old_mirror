@@ -1,0 +1,31 @@
+Urho3D engine & example code by Lasse Öörni (loorni@gmail.com)
+
+Additional MOD/XM playback code by Olli Niemitalo
+
+Urho3D is greatly inspired by OGRE (http://www.ogre3d.org) and Horde3D (http://www.horde3d.org). Additional inspiration & research used:
+
+  * Rectangle packing by Jukka Jylänki (clb) [http://clb.demon.fi/projects/rectangle-bin-packing]
+  * Tangent generation from Terathon [http://www.terathon.com/code/tangent.html] 
+  * Fast, Minimum Storage Ray/Triangle Intersection by Möller & Trumbore [http://www.graphics.cornell.edu/pubs/1997/MT97.pdf]
+  * Linear-Speed Vertex Cache Optimisation by Tom Forsyth [http://home.comcast.net/~tom_forsyth/papers/fast_vert_cache_opt.html]
+  * Software rasterization of triangles based on Chris Hecker's Perspective Texture Mapping series in the Game Developer magazine [http://chrishecker.com/Miscellaneous_Technical_Articles]
+  * Networked Physics by Glenn Fiedler [http://gafferongames.com/game-physics/networked-physics/]
+  * Euler Angle Formulas by David Eberly [http://www.geometrictools.com/Documentation/EulerAngles.pdf]
+
+Urho3D uses the following third-party libraries:
+
+  * [http://www.angelcode.com/angelscript/ AngelScript] (2.20.2)
+  * [http://enet.bespin.org/ ENet] (1.3.0)
+  * [http://www.freetype.org/ FreeType] (2.3.12)
+  * [http://assimp.sourceforge.net/ Open Asset Import Library] (2.0.863)
+  * [http://www.ode.org/ Open Dynamics Engine] (svn rev 1770)
+  * [http://codesuppository.blogspot.com/2006/03/john-ratcliffs-code-suppository-blog.html StanHull]
+  * [http://nothings.org/ stb_image] (1.29)
+  * [http://nothings.org/ stb_vorbis] (0.99996)
+  * [http://www.grinninglizard.com/tinyxml/ TinyXML] (2.6.1)
+
+Ninja model, BlueHighway font and smoke/flare/status bar textures are from OGRE.
+
+Jack and mushroom models are from the [http://www.realxtend.org realXtend] project.
+
+NinjaSnowWar sounds by Veli-Pekka Tätilä.

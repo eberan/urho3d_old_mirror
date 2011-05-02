@@ -1,0 +1,9 @@
+An object that instantiates a new resource given a resource type ID, and returns the pointer to it. Or, if it does not know how to instantiate that particular resource, returns a null pointer.
+
+To be able to instantiate a given resource, references to certain subsystems may be needed. The ResourceFactory is a good place to "hide" those references, instead of having to look up them each time when creating a resource.
+
+Note that the ResourceFactory does not load a resource, it only creates it. Actual loading happens later.
+
+If you define your own resources, define also a corresponding ResourceFactory, then register it with the resource cache.
+
+ComponentFactory is a similar concept, used for [Scene components] instead.

@@ -1,0 +1,5 @@
+Currently there are three example executables in the Urho3D code repository:
+
+  * NetworkTest, a simple chat client/server application.
+  * NinjaSnowWar, a third person action game.
+  * [Urho3DShell Urho3D Shell], an application for running script based Urho3D examples.

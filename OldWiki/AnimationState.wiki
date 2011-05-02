@@ -1,0 +1,10 @@
+Controls playback of one skeletal animation on an AnimatedModel. The properties included are:
+
+  * Time position, in seconds from animation start
+  * Blending weight (0.0 - 1.0)
+  * Blending priority. Animations are lerp-blended in increasing priority order to achieve the final pose
+  * Starting bone for the animation. By default is the skeleton's root bone, can be modified to apply animation only to a part of the skeleton
+  * Looped playback flag
+  * Whether to use nlerp in rotation interpolation. By default false (use slerp instead.) If set to true, interpolation is less CPU-intensive, but is more susceptible to artifacts, depending on the animation data.
+
+Note that by default, all animation states start with zero weight, and need to have a non-zero weight set before the animation will have visible effect.

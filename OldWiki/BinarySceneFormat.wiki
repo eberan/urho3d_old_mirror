@@ -1,0 +1,69 @@
+*Scene properties*
+
+{{{
+byte[4]    Identifier USCN
+cstring    Scene name
+float      Client-side transient prediction staying time in seconds
+float      Client-side visual smoothing constant
+float      Client-side visual smoothing position snap threshold
+}}}
+
+*Physics world properties, if extension is in use*
+
+{{{
+ushort     SDBM hash of "physicsworld"
+Vector3    Gravity
+uint       Physics FPS
+uint       Maximum contacts per collision
+float      Collision bounce velocity threshold
+float      Linear velocity auto-deactivation threshold
+float      Linear velocity damping threshold
+float      Linear velocity damping scale
+float      Angular velocity auto-deactivation threshold
+float      Angular velocity damping threshold
+float      Angular velocity damping scale
+float      Maximum angular velocity to send over the network
+float      ERP parameter
+float      CFM parameter
+float      Contact surface layer thickness
+float      Time accumulator for next update
+uint       Random seed
+}}}
+
+*Octree properties, if extension is in use*
+
+{{{
+ushort     SDBM hash of "octree"
+Vector3    Root-level bounding box minimum
+Vector3    Root-level bounding box maximum
+uint       Octree subdivision levels
+}}}
+
+*Entities*
+
+{{{
+uint       Number of entities in scene
+
+  For each entity:
+  VLE        Entity data buffer size, for skipping in case of error
+  uint       Entity ID
+  cstring    Entity name
+  byte       Network replication flags
+  float      Maximum network update distance (0.0 = unlimited)
+  uint       Group flags
+  VLE        Number of properties
+
+    For each property:
+    ushort     SDBM hash of lowercase property name
+    byte       Variant data type
+    byte[]     Variant data, size depends on type
+    bool       Network replication flag
+
+  VLE        Number of components
+
+    For each component:
+    ushort     SDBM hash of lowercase component type name
+    cstring    Component name
+    byte       Network replication flags
+    byte[]     Component data, size depends on type
+}}}

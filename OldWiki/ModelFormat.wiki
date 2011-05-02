@@ -1,0 +1,90 @@
+*Model geometry and vertex morph data*
+
+{{{
+byte[4]    Identifier UMDL
+uint       Number of vertex buffers
+
+  For each vertex buffer:
+  uint       Vertex count
+  uint       Vertex element mask (determines vertex size)
+  uint       Morphable vertex range start index
+  uint       Morphable vertex count
+  byte[]     Vertex data (vertex count * vertex size)
+
+uint    Number of index buffers
+
+  For each index buffer:
+  uint       Index count
+  uint       Index size (2 for 16-bit indices, 4 for 32-bit indices)
+  byte[]     Index data (index count * index size)  
+
+uint    Number of geometries
+
+  For each geometry:
+  uint       Number of bone mapping entries 
+  uint[]     Bone mapping data, Maps geometry bone indices to global bone indices for HW skinning.
+             May be empty, in this case identity mapping will be used.
+  uint       Number of LOD levels
+
+    For each LOD level:
+    float      LOD distance
+    uint       Primitive type (0 = triangle list, 1 = line list)
+    uint       Vertex buffer index, starting from 0
+    uint       Index buffer index, starting from 0
+    uint       Draw range: index start
+    uint       Draw range: index count
+
+uint    Number of vertex morphs (may be 0)
+
+  For each vertex morph:
+  cstring    Name of morph
+  uint       Number of affected vertex buffers
+ 
+    For each affected vertex buffer:
+    uint       Vertex buffer index, starting from 0
+    uint       Vertex element mask for morph data. Only positions, normals & tangents are supported.
+    uint       Vertex count
+
+      For each vertex:
+      uint       Vertex index
+      Vector3    Position (if included in the mask)
+      Vector3    Normal (if included in the mask)
+      Vector3    Tangent (if included in the mask) 
+}}}
+
+*Skeleton data*
+
+{{{
+uint       Number of bones (may be 0)
+
+  For each bone:
+  cstring    Bone name
+  uint       Parent bone index starting from 0. Same as own bone index for the root bone
+  Vector3    Initial position
+  Quaternion Initial rotation
+  Vector3    Initial scale
+  float[12]  4x3 offset matrix for skinning
+  byte       Bone collision info bitmask. 1 = bounding sphere 2 = bounding box
+  
+  If bounding sphere data included:
+  float      Bone radius
+
+  If bounding box data included:
+  Vector3    Bone bounding box minimum
+  Vector3    Bone bounding box maximum
+}}}
+
+*Bounding box*
+
+{{{
+Vector3    Model bounding box minimum
+Vector3    Model bounding box maximum
+}}}
+
+*LOD level information*
+
+{{{
+uint      LOD level used in physics collision (0xffffffff = use middle)
+uint      LOD level used in renderer raycast (0xffffffff = use same as visible)
+uint      LOD level used in occlusion rendering (0xffffffff = use same as visible)
+}}}

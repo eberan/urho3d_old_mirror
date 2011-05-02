@@ -1,0 +1,95 @@
+===Initialization===
+
+Although the Urho3D subsystems can be used individually, it's most straightforward to instantiate an Engine object (from the Engine library), which will in turn create the required subsystems like the [Rendering Renderer] and [Audio]. Both the [Urho3DShell Urho3D Shell] and NinjaSnowWar examples do this.
+
+For example:
+
+{{{
+mEngine = new Engine("MyApplication", "MyApplication.log");
+mEngine->init();
+}}}
+
+The constructor is supplied with the window title and the log file name, and an optional headless mode flag. The init() function actually creates the subsystems. It takes an optional list of command line arguments, which are used to configure the initial screen & audio output mode.
+
+After initialization, the subsystems can be accessed through the Engine object.
+
+===Creating a scene===
+
+[Scene Scenes] are most convenient to create through the Engine. The parameters that can be given are the scene name, [Octree] bounds and subdivision depth, and whether [Physics physics] is to be utilized. Note that storing the created scene is the application's responsibility, the Engine does not keep a reference to it.
+
+In NinjaSnowWar, the scene is constructed like this (note that though the playing area is small, the world unit is centimeters instead of meters, and therefore the bounds end up quite huge:)
+
+{{{
+mScene = mEngine->createScene("NinjaSnowWar", BoundingBox(-100000.0f, 100000.f));
+}}}
+
+===Running the game loop===
+
+Engine provides a function runFrame() that performs one full update-render cycle. During the cycle, the engine will dispatch various [Event events] into which you can hook to perform your own logic. Running in a continuous loop can be accomplished like this (a simple method of quitting by pressing the ESC key is included):
+
+{{{
+while (!mEngine->isExiting())
+{
+    mEngine->runFrame();
+
+    Input* input = mEngine->getInput();
+    if (input->getKeyPress(KEY_ESCAPE))
+        mEngine->exit();
+}
+}}}
+
+===The update-render cycle in detail===
+
+The full order of operations during one cycle goes like this:
+
+  * Measure amount of time it took to execute the previous frame. This will be the timestep for the current frame. Sleep if FPS limiting needs to be done.
+  * Update input (poll for operating system messages.)
+  * Update networking (poll for arrived packets and send queued packets.)
+  * Send the EVENT_UPDATE event. This is meant for application-wide update logic, not for individual entities or components.
+  * Update the Client & Server if they exist. They will update their scenes at this point as applicable.
+  * Send the EVENT_UPDATESCENES event. All non-networked, not paused scenes will now update themselves.
+  * Send the EVENT_POSTUPDATE event. Like EVENT_UPDATE, this is meant for application-wide logic.
+  * Update the 3D scene rendering pipeline. See [Rendering] for details.
+  * Collect debug geometry, if any. Note that the application can add debug geometry throughout the frame.
+  * Send the EVENT_POSTRENDERUPDATE event.
+  * Update the UI for rendering.
+  * Update audio.
+  * Render, in the following order: 3D scene, debug geometry, and UI.
+  * If the script engine exists, perform script engine garbage collection.
+
+A scene update consists of these substeps:
+
+  * Send the EVENT_SCENEUPDATE event. This is meant for components that implement logic update with variable timestep.
+  * Step the physics world. Depending on the physics framerate in relation to the frame timestep, there might be 0-n physics simulation steps.
+  * For each physics simulation step, the physics world sends the events EVENT_PHYSICSPRESTEP (before) and EVENT_PHYSICSPOSTSTEP (after.) These can be used for fixed timestep logic updates. During the simulation step, the world also checks for collisions, and sends them afterwards using the EVENT_PHYSICSCOLLISION and EVENT_ENTITYCOLLISION events.
+  * Send the EVENT_SCENEPOSTUPDATE event.
+
+The scene's [Octree] will not be updated until EVENT_POSTRENDERUPDATE is sent. This means that any rendering raycasts done before may reflect the previous frame instead of the current (in contrast physics raycasts will always be up to date.) The scene should not be changed in any way in response to EVENT_POSTRENDERUPDATE. Deletion of entities or components is particularly unsafe at that point, because the rendering pipeline has now decided the objects it will render, and holds raw pointers to them. However, adding more debug geometry or updating the UI is allowed.
+
+===Advanced use===
+
+In case you want to override parts of the update cycle, you can also call the functions getNextTimeStep(), update() and render() inside Engine yourself, or replace any or all of them. This is how runFrame() calls them, including beginning and ending the profiling frame, and profiling the whole frame execution time:
+
+{{{
+mProfiler->beginFrame();
+
+{
+    PROFILE(Engine_RunFrame);
+
+    float timeStep = getNextTimeStep();
+    update(timeStep);
+    render();
+    if (mScriptEngine)
+        mScriptEngine->garbageCollect(false);
+}
+
+mProfiler->endFrame();
+}}}
+
+===Headless mode===
+
+In headless mode the Engine will not create rendering & UI subsystems at all. The Audio subsystem is created, but it will not actually output sound. This mode is enabled by supplying the optional third parameter with true value to the engine's constructor.
+
+Engine functions can be normally called while in headless mode, it will just skip rendering, audio & UI updates as applicable. Most resources except textures and shaders will be loaded and can be used as usual: any vertex data is kept in system memory instead of GPU memory, and playing of sounds will be simulated.
+
+However, remember that getRenderer(), getPipeline(), getUI() and getUIRoot() will all return null in headless mode.
