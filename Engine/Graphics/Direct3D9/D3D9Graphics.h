@@ -72,12 +72,10 @@ public:
     
     /// %Set window title.
     void SetWindowTitle(const String& windowTitle);
-    /// %Set screen mode. In deferred rendering modes multisampling means edge filtering instead of MSAA.
-    bool SetMode(RenderMode mode, int width, int height, bool fullscreen, bool vsync, int multiSample);
+    /// %Set screen mode.
+    bool SetMode(int width, int height, bool fullscreen, bool vsync);
     /// %Set screen resolution only.
     bool SetMode(int width, int height);
-    /// %Set rendering mode only.
-    bool SetMode(RenderMode mode);
     /// Toggle between full screen and windowed mode.
     bool ToggleFullscreen();
     /// Close the window.
@@ -135,9 +133,11 @@ public:
     bool NeedParameterUpdate(StringHash param, const void* source);
     /// Check whether the current pixel shader uses a texture unit.
     bool NeedTextureUnit(TextureUnit unit);
-    /// Clear remembered shader parameter sources.
+    /// Clear all remembered shader parameter sources.
     void ClearParameterSources();
-    /// Clear remembered transform shader parameter sources.
+    /// Clear one remembered shader parameter source.
+    void ClearParameterSource(StringHash param);
+    /// Clear remembered transform (model and view-projection matrices) shader parameter sources.
     void ClearTransformSources();
     /// %Set texture.
     void SetTexture(unsigned index, Texture* texture);
@@ -212,8 +212,6 @@ public:
     GraphicsImpl* GetImpl() const { return impl_; }
     /// Return window title.
     const String& GetWindowTitle() const { return windowTitle_; }
-    /// Return rendering mode.
-    RenderMode GetRenderMode() const { return mode_; }
     /// Return window width.
     int GetWidth() const { return width_; }
     /// Return window height.
@@ -244,10 +242,10 @@ public:
     unsigned GetHiresShadowMapFormat() const { return hiresShadowMapFormat_; }
     /// Return whether texture render targets are supported.
     bool GetRenderTargetSupport() const { return renderTargetSupport_; }
-    /// Return whether deferred rendering is supported.
-    bool GetDeferredSupport() const { return deferredSupport_; }
     /// Return whether Shader Model 3 is supported.
     bool GetSM3Support() const { return hasSM3_; }
+    /// Return whether the hardware depth buffer can be sampled.
+    bool GetHardwareDepthSupport() const { return hardwareDepthSupport_; }
     /// Return whether shadow map depth compare is done in hardware.
     bool GetHardwareShadowSupport() const { return hardwareShadowSupport_; }
     /// Return whether 24-bit shadow maps are supported.
@@ -328,8 +326,8 @@ public:
     unsigned GetStreamFrequency(unsigned index) const;
     /// Return render target width and height.
     IntVector2 GetRenderTargetDimensions() const;
-    /// Return diffuse buffer for deferred rendering.
-    Texture2D* GetDiffBuffer() const { return diffBuffer_; }
+    /// Return light accumulation buffer for deferred rendering.
+    Texture2D* GetLightBuffer() const { return lightBuffer_; }
     /// Return normal buffer for deferred rendering.
     Texture2D* GetNormalBuffer() const { return normalBuffer_; }
     /// Return depth buffer for deferred rendering. If reading hardware depth is supported, return a depth texture.
@@ -385,8 +383,6 @@ private:
     GraphicsImpl* impl_;
     /// Window title.
     String windowTitle_;
-    /// Rendering mode.
-    RenderMode mode_;
     /// Window width.
     int width_;
     /// Window height.
@@ -407,10 +403,12 @@ private:
     bool deviceLost_;
     /// Query issued (used to flush the GPU command queue) flag.
     bool queryIssued_;
+    //! Use auto depth stencil flag
+    bool systemDepthStencil_;
     /// Texture render target support flag.
     bool renderTargetSupport_;
-    /// Deferred rendering support flag.
-    bool deferredSupport_;
+    /// Hardware depth sampling support flag.
+    bool hardwareDepthSupport_;
     /// Hardware shadow map depth compare support flag.
     bool hardwareShadowSupport_;
     /// 24-bit shadow map support flag.
@@ -445,8 +443,8 @@ private:
     HashMap<unsigned, SharedPtr<VertexBuffer> > immediateVertexBuffers_;
     /// Immediate rendering vertex buffer start positions.
     HashMap<unsigned, unsigned> immediateVertexBufferPos_;
-    /// Deferred rendering diffuse buffer.
-    SharedPtr<Texture2D> diffBuffer_;
+    /// Deferred rendering light accumulation buffer.
+    SharedPtr<Texture2D> lightBuffer_;
     /// Deferred rendering normal buffer.
     SharedPtr<Texture2D> normalBuffer_;
     /// Deferred rendering depth buffer.

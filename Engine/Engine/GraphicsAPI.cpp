@@ -275,7 +275,7 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterEnumValue("PassType", "PASS_GBUFFER", PASS_GBUFFER);
     engine->RegisterEnumValue("PassType", "PASS_BASE", PASS_BASE);
     engine->RegisterEnumValue("PassType", "PASS_LIGHT", PASS_LIGHT);
-    engine->RegisterEnumValue("PassType", "PASS_EXTRA", PASS_EXTRA);
+    engine->RegisterEnumValue("PassType", "PASS_CUSTOM", PASS_CUSTOM);
     engine->RegisterEnumValue("PassType", "PASS_SHADOW", PASS_SHADOW);
     
     engine->RegisterEnum("BlendMode");
@@ -301,9 +301,7 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterEnumValue("CullMode", "CULL_CCW", CULL_CCW);
     engine->RegisterEnumValue("CullMode", "CULL_CW", CULL_CW);
     
-    engine->RegisterObjectType("Pass", 0, asOBJ_REF);
-    engine->RegisterObjectBehaviour("Pass", asBEHAVE_ADDREF, "void f()", asFUNCTION(FakeAddRef), asCALL_CDECL_OBJLAST);
-    engine->RegisterObjectBehaviour("Pass", asBEHAVE_RELEASE, "void f()", asFUNCTION(FakeReleaseRef), asCALL_CDECL_OBJLAST);
+    RegisterRefCounted<Pass>(engine, "Pass");
     engine->RegisterObjectMethod("Pass", "void set_alphaMask(bool)", asMETHOD(Pass, SetAlphaMask), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "bool get_alphaMask() const", asMETHOD(Pass, GetAlphaMask), asCALL_THISCALL);
     engine->RegisterObjectMethod("Pass", "void set_alphaTest(bool)", asMETHOD(Pass, SetAlphaTest), asCALL_THISCALL);
@@ -325,7 +323,7 @@ static void RegisterMaterial(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Technique", "bool HasPass(PassType) const", asMETHOD(Technique, HasPass), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "void set_sm3(bool)", asMETHOD(Technique, SetIsSM3), asCALL_THISCALL);
     engine->RegisterObjectMethod("Technique", "bool get_sm3() const", asMETHOD(Technique, IsSM3), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Technique", "Pass@+ get_pass(PassType)", asMETHOD(Technique, GetPass), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Technique", "Pass@+ get_passes(PassType)", asMETHOD(Technique, GetPass), asCALL_THISCALL);
     
     RegisterResource<Material>(engine, "Material");
     engine->RegisterObjectMethod("Material", "void SetUVTransform(const Vector2&in, float, const Vector2&in)", asMETHODPR(Material, SetUVTransform, (const Vector2&, float, const Vector2&), void), asCALL_THISCALL);
@@ -691,14 +689,9 @@ static Graphics* GetGraphics()
 
 static void RegisterGraphics(asIScriptEngine* engine)
 {
-    engine->RegisterEnum("RenderMode");
-    engine->RegisterEnumValue("RenderMode", "RENDER_DEFERRED", RENDER_DEFERRED);
-    engine->RegisterEnumValue("RenderMode", "RENDER_FORWARD", RENDER_FORWARD);
-    
     RegisterObject<Graphics>(engine, "Graphics");
-    engine->RegisterObjectMethod("Graphics", "bool SetMode(RenderMode, int, int, bool, bool, int)", asMETHODPR(Graphics, SetMode, (RenderMode, int, int, bool, bool, int), bool), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Graphics", "bool SetMode(int, int, bool, bool)", asMETHODPR(Graphics, SetMode, (int, int, bool, bool), bool), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool SetMode(int, int)", asMETHODPR(Graphics, SetMode, (int, int), bool), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Graphics", "bool SetMode(RenderMode)", asMETHODPR(Graphics, SetMode, (RenderMode), bool), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool ToggleFullscreen()", asMETHOD(Graphics, ToggleFullscreen), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "void Close()", asMETHOD(Graphics, Close), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool TakeScreenShot(Image@+)", asMETHOD(Graphics, TakeScreenShot), asCALL_THISCALL);
@@ -706,10 +699,8 @@ static void RegisterGraphics(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Graphics", "bool get_flushGPU() const", asMETHOD(Graphics, GetFlushGPU), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "void set_windowTitle(const String&in)", asMETHOD(Graphics, SetWindowTitle), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "const String& get_windowTitle() const", asMETHOD(Graphics, GetWindowTitle), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Graphics", "RenderMode get_renderMode() const", asMETHOD(Graphics, GetRenderMode), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "int get_width() const", asMETHOD(Graphics, GetWidth), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "int get_height() const", asMETHOD(Graphics, GetHeight), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Graphics", "int get_multiSample() const", asMETHOD(Graphics, GetMultiSample), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_fullscreen() const", asMETHOD(Graphics, GetFullscreen), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_vsync() const", asMETHOD(Graphics, GetVSync), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_initialized() const", asMETHOD(Graphics, IsInitialized), asCALL_THISCALL);
@@ -717,7 +708,6 @@ static void RegisterGraphics(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Graphics", "uint get_numPrimitives() const", asMETHOD(Graphics, GetNumPrimitives), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "uint get_numBatches() const", asMETHOD(Graphics, GetNumBatches), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_renderTargetSupport() const", asMETHOD(Graphics, GetRenderTargetSupport), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Graphics", "bool get_deferredSupport() const", asMETHOD(Graphics, GetDeferredSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_sm3Support() const", asMETHOD(Graphics, GetSM3Support), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_hardwareShadowSupport() const", asMETHOD(Graphics, GetHardwareShadowSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_hiresShadowSupport() const", asMETHOD(Graphics, GetHiresShadowSupport), asCALL_THISCALL);
@@ -761,7 +751,6 @@ static void RegisterRenderer(asIScriptEngine* engine)
     engine->RegisterObjectProperty("EdgeFilterParameters", "float strength", offsetof(EdgeFilterParameters, strength_));
     
     RegisterObject<Renderer>(engine, "Renderer");
-    engine->RegisterObjectMethod("Renderer", "void SetNumShadowMaps(uint, uint, uint)", asMETHOD(Renderer, SetNumShadowMaps), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "void DrawDebugGeometry(bool) const", asMETHOD(Renderer, DrawDebugGeometry), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "void set_numViewports(uint)", asMETHOD(Renderer, SetNumViewports), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "uint get_numViewports() const", asMETHOD(Renderer, GetNumViewports), asCALL_THISCALL);
@@ -783,8 +772,6 @@ static void RegisterRenderer(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Renderer", "int get_shadowMapSize() const", asMETHOD(Renderer, GetShadowMapSize), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "void set_shadowMapHiresDepth(bool)", asMETHOD(Renderer, SetShadowMapHiresDepth), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "bool get_shadowMapHiresDepth() const", asMETHOD(Renderer, GetShadowMapHiresDepth), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Renderer", "void set_reuseShadowMaps(bool)", asMETHOD(Renderer, SetReuseShadowMaps), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Renderer", "bool get_reuseShadowMaps() const", asMETHOD(Renderer, GetReuseShadowMaps), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "void set_dynamicInstancing(bool)", asMETHOD(Renderer, SetDynamicInstancing), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "bool get_dynamicInstancing() const", asMETHOD(Renderer, GetDynamicInstancing), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "const EdgeFilterParameters& get_edgeFilter() const", asMETHOD(Renderer, GetEdgeFilter), asCALL_THISCALL);
@@ -803,9 +790,6 @@ static void RegisterRenderer(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Renderer", "uint get_numShadowMaps(bool) const", asMETHOD(Renderer, GetNumShadowMaps), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "uint get_numOccluders(bool) const", asMETHOD(Renderer, GetNumOccluders), asCALL_THISCALL);
     engine->RegisterObjectMethod("Renderer", "uint get_numShadowOccluders(bool) const", asMETHOD(Renderer, GetNumShadowOccluders), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Renderer", "uint get_numFullShadowMaps() const", asMETHOD(Renderer, GetNumFullShadowMaps), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Renderer", "uint get_numHalfShadowMaps() const", asMETHOD(Renderer, GetNumHalfShadowMaps), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Renderer", "uint get_numQuarterShadowMaps() const", asMETHOD(Renderer, GetNumQuarterShadowMaps), asCALL_THISCALL);
     engine->RegisterGlobalFunction("Renderer@+ get_renderer()", asFUNCTION(GetRenderer), asCALL_CDECL);
 }
 

@@ -205,34 +205,50 @@ static const String lightPSVariations[] =
 {
     "Dir",
     "DirSpec",
-    "DirShadow",
-    "DirShadowSpec",
     "Spot",
     "SpotSpec",
-    "SpotShadow",
-    "SpotShadowSpec",
     "Point",
     "PointSpec",
-    "PointShadow",
-    "PointShadowSpec",
     "PointMask",
     "PointMaskSpec",
-    "PointMaskShadow",
-    "PointMaskShadowSpec",
+    "HWDir",
+    "HWDirSpec",
+    "HWSpot",
+    "HWSpotSpec",
+    "HWPoint",
+    "HWPointSpec",
+    "HWPointMask",
+    "HWPointMaskSpec",
     "OrthoDir",
     "OrthoDirSpec",
-    "OrthoDirShadow",
-    "OrthoDirShadowSpec",
     "OrthoSpot",
     "OrthoSpotSpec",
-    "OrthoSpotShadow",
-    "OrthoSpotShadowSpec",
     "OrthoPoint",
     "OrthoPointSpec",
-    "OrthoPointShadow",
-    "OrthoPointShadowSpec",
     "OrthoPointMask",
     "OrthoPointMaskSpec",
+    "DirShadow",
+    "DirShadowSpec",
+    "SpotShadow",
+    "SpotShadowSpec",
+    "PointShadow",
+    "PointShadowSpec",
+    "PointMaskShadow",
+    "PointMaskShadowSpec",
+    "HWDirShadow",
+    "HWDirShadowSpec",
+    "HWSpotShadow",
+    "HWSpotShadowSpec",
+    "HWPointShadow",
+    "HWPointShadowSpec",
+    "HWPointMaskShadow",
+    "HWPointMaskShadowSpec",
+    "OrthoDirShadow",
+    "OrthoDirShadowSpec",
+    "OrthoSpotShadow",
+    "OrthoSpotShadowSpec",
+    "OrthoPointShadow",
+    "OrthoPointShadowSpec",
     "OrthoPointMaskShadow",
     "OrthoPointMaskShadowSpec"
 };
@@ -264,7 +280,6 @@ Renderer::Renderer(Context* context) :
     materialQuality_(QUALITY_HIGH),
     shadowMapSize_(1024),
     shadowMapHiresDepth_(false),
-    reuseShadowMaps_(true),
     dynamicInstancing_(true),
     edgeFilter_(EdgeFilterParameters(0.4f, 0.5f, 0.9f)),
     maxOccluderTriangles_(5000),
@@ -276,10 +291,6 @@ Renderer::Renderer(Context* context) :
 {
     SubscribeToEvent(E_SCREENMODE, HANDLER(Renderer, HandleScreenMode));
     SubscribeToEvent(E_RENDERUPDATE, HANDLER(Renderer, HandleRenderUpdate));
-    
-    // Default to one of each shadow map resolution
-    for (unsigned i = 0; i < NUM_SHADOWMAP_RESOLUTIONS; ++i)
-        shadowMaps_[i].Resize(1);
     
     // Try to initialize right now, but skip if screen mode is not yet set
     Initialize();
@@ -373,31 +384,6 @@ void Renderer::SetShadowMapHiresDepth(bool enable)
         enable = false;
     
     shadowMapHiresDepth_ = enable;
-    if (!CreateShadowMaps())
-        drawShadows_ = false;
-}
-
-void Renderer::SetReuseShadowMaps(bool enable)
-{
-    if (enable == reuseShadowMaps_)
-        return;
-    
-    reuseShadowMaps_ = enable;
-    if (reuseShadowMaps_)
-    {
-        for (unsigned i = 0; i < NUM_SHADOWMAP_RESOLUTIONS; ++i)
-            shadowMaps_[i].Resize(1);
-    }
-    if (!CreateShadowMaps())
-        drawShadows_ = false;
-    shadersDirty_ = true;
-}
-
-void Renderer::SetNumShadowMaps(unsigned full, unsigned half, unsigned quarter)
-{
-    shadowMaps_[0].Resize(full ? full : 1);
-    shadowMaps_[1].Resize(half ? half : 1);
-    shadowMaps_[2].Resize(quarter ? quarter : 1);
     if (!CreateShadowMaps())
         drawShadows_ = false;
 }
@@ -815,25 +801,7 @@ Texture2D* Renderer::GetShadowMap(float resolution)
     if (resolution < 0.75f)
         index = (resolution >= 0.375f) ? 1 : 2;
     
-    if (reuseShadowMaps_)
-        return shadowMaps_[index][0];
-    else
-    {
-        // If higher resolution shadow maps already used up, fall back to lower resolutions
-        while (index < NUM_SHADOWMAP_RESOLUTIONS)
-        {
-            if (shadowMapUseCount_[index] < shadowMaps_[index].Size())
-                return shadowMaps_[index][shadowMapUseCount_[index]++];
-            ++index;
-        }
-        return 0;
-    }
-}
-
-void Renderer::ResetShadowMapUseCount()
-{
-    for (unsigned i = 0; i < NUM_SHADOWMAP_RESOLUTIONS; ++i)
-        shadowMapUseCount_[i] = 0;
+    return shadowMaps_[index];
 }
 
 ShaderVariation* Renderer::GetShader(const String& name, const String& extension, bool checkExists) const
@@ -863,7 +831,7 @@ ShaderVariation* Renderer::GetShader(const String& name, const String& extension
         return 0;
 }
 
-void Renderer::SetBatchShaders(Batch& batch, Technique* technique, Pass* pass, bool allowShadows)
+void Renderer::SetBatchShaders(Batch& batch, Technique* technique, Pass* pass)
 {
     batch.pass_ = pass;
     
@@ -907,11 +875,6 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* technique, Pass* pass, b
             
             if (specularLighting_ && light->GetSpecularIntensity() > 0.0f)
                 psi += LPS_SPEC;
-            if (allowShadows && light->GetShadowMap())
-            {
-                vsi += LVS_SHADOW;
-                psi += LPS_SHADOW;
-            }
             
             switch (light->GetLightType())
             {
@@ -984,6 +947,8 @@ void Renderer::SetLightVolumeShaders(Batch& batch)
         vsi += DLVS_ORTHO;
         psi += DLPS_ORTHO;
     }
+    else if (graphics_->GetHardwareDepthSupport())
+        psi += DLPS_HW;
     
     batch.material_ = 0;
     batch.pass_ = 0;
@@ -1006,26 +971,20 @@ void Renderer::LoadShaders()
     stencilPS_ = GetPixelShader("Stencil");
     lightVS_.Clear();
     lightPS_.Clear();
+    lightVS_.Resize(MAX_DEFERRED_LIGHT_VS_VARIATIONS);
+    lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
     
-    RenderMode mode = graphics_->GetRenderMode();
-    if (mode != RENDER_FORWARD)
+    unsigned hwShadows = graphics_->GetHardwareShadowSupport() ? 1 : 0;
+    
+    for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_VS_VARIATIONS; ++i)
+        lightVS_[i] = GetVertexShader("Light_" + deferredLightVSVariations[i]);
+    
+    for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_PS_VARIATIONS; ++i)
     {
-        lightVS_.Resize(MAX_DEFERRED_LIGHT_VS_VARIATIONS);
-        lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
-        
-        unsigned hwShadows = graphics_->GetHardwareShadowSupport() ? 1 : 0;
-        
-        for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_VS_VARIATIONS; ++i)
-            lightVS_[i] = GetVertexShader("Light_" + deferredLightVSVariations[i]);
-        
-        for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_PS_VARIATIONS; ++i)
-        {
-            unsigned variation = i % DLPS_SPOT;
-            if (variation == DLPS_SHADOW || variation == DLPS_SHADOWSPEC)
-                lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + hwVariations[hwShadows]);
-            else
-                lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i]);
-        }
+        if (i >= DLPS_SHADOW)
+            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + hwVariations[hwShadows]);
+        else
+            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i]);
     }
     
     // Remove shaders that are no longer referenced from the cache
@@ -1036,36 +995,24 @@ void Renderer::LoadShaders()
 
 void Renderer::LoadMaterialShaders(Technique* technique)
 {
+    LoadPassShaders(technique, PASS_BASE);
+    LoadPassShaders(technique, PASS_CUSTOM);
     LoadPassShaders(technique, PASS_SHADOW);
-    LoadPassShaders(technique, PASS_EXTRA);
     
-    RenderMode mode = graphics_->GetRenderMode();
-    if (mode == RENDER_FORWARD)
-    {
-        LoadPassShaders(technique, PASS_BASE);
-        LoadPassShaders(technique, PASS_LIGHT);
-    }
+    if (technique->HasPass(PASS_GBUFFER))
+        LoadPassShaders(technique, PASS_GBUFFER);
     else
-    {
-        if (technique->HasPass(PASS_GBUFFER))
-            LoadPassShaders(technique, PASS_GBUFFER);
-        else
-        {
-            LoadPassShaders(technique, PASS_BASE);
-            // If shadow maps are not reused, transparencies can be rendered shadowed
-            LoadPassShaders(technique, PASS_LIGHT, !reuseShadowMaps_);
-        }
-    }
+        LoadPassShaders(technique, PASS_LIGHT);
 }
 
-void Renderer::LoadPassShaders(Technique* technique, PassType pass, bool allowShadows)
+void Renderer::LoadPassShaders(Technique* technique, PassType type)
 {
-    Map<PassType, Pass>::Iterator i = technique->passes_.Find(pass);
-    if (i == technique->passes_.End())
+    Pass* pass = technique->GetPass(type);
+    if (!pass)
         return;
     
-    String vertexShaderName = i->second_.GetVertexShaderName();
-    String pixelShaderName = i->second_.GetPixelShaderName();
+    String vertexShaderName = pass->GetVertexShaderName();
+    String pixelShaderName = pass->GetPixelShaderName();
     
     // Check if the shader name is already a variation in itself
     if (vertexShaderName.Find('_') == String::NPOS)
@@ -1073,62 +1020,42 @@ void Renderer::LoadPassShaders(Technique* technique, PassType pass, bool allowSh
     if (pixelShaderName.Find('_') == String::NPOS)
         pixelShaderName += "_";
     
-    // If ambient pass is transparent, and shadow maps are reused, do not load shadow variations
-    if (reuseShadowMaps_ && pass == PASS_LIGHT)
+    // If INTZ depth is used, do not write depth into a rendertarget in the G-buffer pass
+    if (type == PASS_GBUFFER)
     {
-        if (!technique->HasPass(PASS_BASE) || technique->GetPass(PASS_BASE)->GetBlendMode() != BLEND_REPLACE)
-            allowShadows = false;
+        unsigned hwDepth = graphics_->GetHardwareDepthSupport() ? 1 : 0;
+        vertexShaderName += hwVariations[hwDepth];
+        pixelShaderName += hwVariations[hwDepth];
     }
     
-    unsigned hwShadows = graphics_->GetHardwareShadowSupport() ? 1 : 0;
-    
-    Vector<SharedPtr<ShaderVariation> >& vertexShaders = i->second_.GetVertexShaders();
-    Vector<SharedPtr<ShaderVariation> >& pixelShaders = i->second_.GetPixelShaders();
+    Vector<SharedPtr<ShaderVariation> >& vertexShaders = pass->GetVertexShaders();
+    Vector<SharedPtr<ShaderVariation> >& pixelShaders = pass->GetPixelShaders();
     
     // Forget all the old shaders
     vertexShaders.Clear();
     pixelShaders.Clear();
     
-    switch (i->first_)
+    if (type == PASS_LIGHT)
     {
-    default:
+        vertexShaders.Resize(MAX_GEOMETRYTYPES * MAX_LIGHT_VS_VARIATIONS);
+        pixelShaders.Resize(MAX_LIGHT_PS_VARIATIONS);
+        
+        for (unsigned j = 0; j < MAX_GEOMETRYTYPES * MAX_LIGHT_VS_VARIATIONS; ++j)
+        {
+            unsigned g = j / MAX_LIGHT_VS_VARIATIONS;
+            unsigned l = j % MAX_LIGHT_VS_VARIATIONS;
+            vertexShaders[j] = GetVertexShader(vertexShaderName + lightVSVariations[l] + geometryVSVariations[g], g != 0);
+        }
+        for (unsigned j = 0; j < MAX_LIGHT_PS_VARIATIONS; ++j)
+            pixelShaders[j] = GetPixelShader(pixelShaderName + lightPSVariations[j]);
+    }
+    else
+    {
         vertexShaders.Resize(MAX_GEOMETRYTYPES);
         pixelShaders.Resize(1);
         for (unsigned j = 0; j < MAX_GEOMETRYTYPES; ++j)
             vertexShaders[j] = GetVertexShader(vertexShaderName + geometryVSVariations[j], j != 0);
         pixelShaders[0] = GetPixelShader(pixelShaderName);
-        break;
-        
-    case PASS_LIGHT:
-        {
-            vertexShaders.Resize(MAX_GEOMETRYTYPES * MAX_LIGHT_VS_VARIATIONS);
-            pixelShaders.Resize(MAX_LIGHT_PS_VARIATIONS);
-            
-            for (unsigned j = 0; j < MAX_GEOMETRYTYPES * MAX_LIGHT_VS_VARIATIONS; ++j)
-            {
-                unsigned g = j / MAX_LIGHT_VS_VARIATIONS;
-                unsigned l = j % MAX_LIGHT_VS_VARIATIONS;
-                if (!(l & LVS_SHADOW) || allowShadows)
-                    vertexShaders[j] = GetVertexShader(vertexShaderName + lightVSVariations[l] + geometryVSVariations[g], g != 0);
-                else
-                    vertexShaders[j].Reset();
-            }
-            for (unsigned j = 0; j < MAX_LIGHT_PS_VARIATIONS; ++j)
-            {
-                unsigned variation = j % LPS_SPOT;
-                if (variation == LPS_SHADOW || variation == LPS_SHADOWSPEC)
-                {
-                    if (allowShadows)
-                        pixelShaders[j] = GetPixelShader(pixelShaderName + lightPSVariations[j] +
-                            hwVariations[hwShadows]);
-                    else
-                        pixelShaders[j].Reset();
-                }
-                else
-                    pixelShaders[j] = GetPixelShader(pixelShaderName + lightPSVariations[j]);
-            }
-            break;
-        }
     }
     
     technique->MarkShadersLoaded(shadersChangedFrameNumber_);
@@ -1255,10 +1182,7 @@ bool Renderer::CreateShadowMaps()
     if (!drawShadows_)
     {
         for (unsigned i = 0; i < NUM_SHADOWMAP_RESOLUTIONS; ++i)
-        {
-            for (unsigned j = 0; j < shadowMaps_[i].Size(); ++j)
-                shadowMaps_[i][j].Reset();
-        }
+            shadowMaps_[i].Reset();
         return true;
     }
     
@@ -1267,15 +1191,13 @@ bool Renderer::CreateShadowMaps()
     unsigned size = shadowMapSize_;
     for (unsigned i = 0; i < NUM_SHADOWMAP_RESOLUTIONS; ++i)
     {
-        for (unsigned j = 0; j < shadowMaps_[i].Size(); ++j)
-        {
-            if (!shadowMaps_[i][j])
-                shadowMaps_[i][j] = new Texture2D(context_);
-            if (!shadowMaps_[i][j]->SetSize(size, size, shadowMapFormat, TEXTURE_DEPTHSTENCIL))
-                return false;
-            shadowMaps_[i][j]->SetFilterMode(FILTER_BILINEAR);
-            shadowMaps_[i][j]->SetShadowCompare(true);
-        }
+        if (!shadowMaps_[i])
+            shadowMaps_[i] = new Texture2D(context_);
+        if (!shadowMaps_[i]->SetSize(size, size, shadowMapFormat, TEXTURE_DEPTHSTENCIL))
+            return false;
+        shadowMaps_[i]->SetFilterMode(FILTER_BILINEAR);
+        shadowMaps_[i]->SetShadowCompare(true);
+        
         size >>= 1;
     }
     #else
@@ -1288,17 +1210,15 @@ bool Renderer::CreateShadowMaps()
         if (!colorShadowMaps_[i]->SetSize(size, size, dummyColorFormat, TEXTURE_RENDERTARGET))
             return false;
         
-        for (unsigned j = 0; j < shadowMaps_[i].Size(); ++j)
-        {
-            if (!shadowMaps_[i][j])
-                shadowMaps_[i][j] = new Texture2D(context_);
-            if (!shadowMaps_[i][j]->SetSize(size, size, shadowMapFormat, TEXTURE_DEPTHSTENCIL))
-                return false;
-            shadowMaps_[i][j]->SetFilterMode(hardwarePCF ? FILTER_BILINEAR : FILTER_NEAREST);
-            
-            // Link the color rendertarget to depth rendertarget
-            shadowMaps_[i][j]->GetRenderSurface()->SetLinkedRenderTarget(colorShadowMaps_[i]->GetRenderSurface());
-        }
+        if (!shadowMaps_[i])
+            shadowMaps_[i] = new Texture2D(context_);
+        if (!shadowMaps_[i]->SetSize(size, size, shadowMapFormat, TEXTURE_DEPTHSTENCIL))
+            return false;
+        shadowMaps_[i]->SetFilterMode(hardwarePCF ? FILTER_BILINEAR : FILTER_NEAREST);
+        
+        // Link the color rendertarget to depth rendertarget
+        shadowMaps_[i]->GetRenderSurface()->SetLinkedRenderTarget(colorShadowMaps_[i]->GetRenderSurface());
+        
         size >>= 1;
     }
     #endif
@@ -1337,145 +1257,6 @@ Node* Renderer::CreateTempNode()
     
     ++numTempNodes_;
     return node;
-}
-
-void Renderer::SetupLightBatch(Batch& batch)
-{
-    Matrix3x4 view(batch.camera_->GetInverseWorldTransform());
-    
-    Light* light = batch.light_;
-    float lightExtent = light->GetVolumeExtent();
-    float lightViewDist = (light->GetWorldPosition() - batch.camera_->GetWorldPosition()).LengthFast();
-    
-    graphics_->SetAlphaTest(false);
-    graphics_->SetBlendMode(BLEND_ADD);
-    graphics_->SetDepthWrite(false);
-    
-    if (light->GetLightType() == LIGHT_DIRECTIONAL)
-    {
-        // Get projection without jitter offset to ensure the whole screen is filled
-        Matrix4 projection(batch.camera_->GetProjection(false));
-        
-        // If the light does not extend to the near plane, use a stencil test. Else just draw with depth fail
-        if (light->GetNearSplit() <= batch.camera_->GetNearClip())
-        {
-            graphics_->SetCullMode(CULL_NONE);
-            graphics_->SetDepthTest(CMP_GREATER);
-            graphics_->SetStencilTest(false);
-        }
-        else
-        {
-            Matrix3x4 nearTransform = light->GetDirLightTransform(*batch.camera_, true);
-            
-            // Set state for stencil rendering
-            graphics_->SetColorWrite(false);
-            graphics_->SetCullMode(CULL_NONE);
-            graphics_->SetDepthTest(CMP_LESSEQUAL);
-            graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
-            graphics_->SetShaders(stencilVS_, stencilPS_);
-            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection);
-            graphics_->SetShaderParameter(VSP_MODEL, nearTransform);
-            graphics_->ClearTransformSources();
-            
-            // Draw to stencil
-            batch.geometry_->Draw(graphics_);
-            
-            // Re-enable color write, set test for rendering the actual light
-            graphics_->SetColorWrite(true);
-            graphics_->SetDepthTest(CMP_GREATER);
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
-        }
-    }
-    else
-    {
-        Matrix4 projection(batch.camera_->GetProjection());
-        const Matrix3x4& model = light->GetVolumeTransform(*batch.camera_);
-        
-        if (light->GetLightType() == LIGHT_SPLITPOINT)
-        {
-            // Shadowed point light, split in 6 frustums: mask out overlapping pixels to prevent overlighting
-            // Check whether we should draw front or back faces
-            bool drawBackFaces = lightViewDist < (lightExtent + batch.camera_->GetNearClip());
-            graphics_->SetColorWrite(false);
-            graphics_->SetCullMode(drawBackFaces ? CULL_CCW : CULL_CW);
-            graphics_->SetDepthTest(drawBackFaces ? CMP_GREATER : CMP_LESS);
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_INCR, OP_KEEP, OP_KEEP, 0);
-            graphics_->SetShaders(stencilVS_, stencilPS_);
-            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
-            graphics_->SetShaderParameter(VSP_MODEL, model);
-            
-            // Draw the other faces to stencil to mark where we should not draw
-            batch.geometry_->Draw(graphics_);
-            
-            graphics_->SetColorWrite(true);
-            graphics_->SetCullMode(drawBackFaces ? CULL_CW : CULL_CCW);
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_DECR, OP_DECR, OP_KEEP, 0);
-        }
-        else
-        {
-            // If light is close to near clip plane, we might be inside light volume
-            if (lightViewDist < (lightExtent + batch.camera_->GetNearClip()))
-            {
-                // In this case reverse cull mode & depth test and render back faces
-                graphics_->SetCullMode(CULL_CW);
-                graphics_->SetDepthTest(CMP_GREATER);
-                graphics_->SetStencilTest(false);
-            }
-            else
-            {
-                // If not too close to far clip plane, write the back faces to stencil for optimization,
-                // then render front faces. Else just render front faces.
-                if (lightViewDist < (batch.camera_->GetFarClip() - lightExtent))
-                {
-                    // Set state for stencil rendering
-                    graphics_->SetColorWrite(false);
-                    graphics_->SetCullMode(CULL_CW);
-                    graphics_->SetDepthTest(CMP_GREATER);
-                    graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
-                    graphics_->SetShaders(stencilVS_, stencilPS_);
-                    graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
-                    graphics_->SetShaderParameter(VSP_MODEL, model);
-                    
-                    // Draw to stencil
-                    batch.geometry_->Draw(graphics_);
-                    
-                    // Re-enable color write, set test for rendering the actual light
-                    graphics_->SetColorWrite(true);
-                    graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
-                    graphics_->SetCullMode(CULL_CCW);
-                    graphics_->SetDepthTest(CMP_LESS);
-                }
-                else
-                {
-                    graphics_->SetStencilTest(false);
-                    graphics_->SetCullMode(CULL_CCW);
-                    graphics_->SetDepthTest(CMP_LESS);
-                }
-            }
-        }
-    }
-}
-
-void Renderer::DrawFullScreenQuad(Camera& camera, ShaderVariation* vs, ShaderVariation* ps, bool nearQuad, const HashMap<StringHash, Vector4>& shaderParameters)
-{
-    Light quadDirLight(context_);
-    Matrix3x4 model(quadDirLight.GetDirLightTransform(camera, nearQuad));
-    
-    graphics_->SetCullMode(CULL_NONE);
-    graphics_->SetShaders(vs, ps);
-    graphics_->SetShaderParameter(VSP_MODEL, model);
-    // Get projection without jitter offset to ensure the whole screen is filled
-    graphics_->SetShaderParameter(VSP_VIEWPROJ, camera.GetProjection(false));
-    graphics_->ClearTransformSources();
-    
-    // Set global shader parameters as needed
-    for (HashMap<StringHash, Vector4>::ConstIterator i = shaderParameters.Begin(); i != shaderParameters.End(); ++i)
-    {
-        if (graphics_->NeedParameterUpdate(i->first_, &shaderParameters))
-            graphics_->SetShaderParameter(i->first_, i->second_);
-    }
-    
-    dirLightGeometry_->Draw(graphics_);
 }
 
 void Renderer::HandleScreenMode(StringHash eventType, VariantMap& eventData)

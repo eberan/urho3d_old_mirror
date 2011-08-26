@@ -241,25 +241,6 @@ void HandleUpdate(StringHash eventType, VariantMap& eventData)
 
         if (input.keyPress['1'])
         {
-            int nextRenderMode = graphics.renderMode;
-            if (input.keyDown[KEY_LSHIFT])
-            {
-                --nextRenderMode;
-                if (nextRenderMode < 0)
-                    nextRenderMode = 1;
-            }
-            else
-            {
-                ++nextRenderMode;
-                if (nextRenderMode > 1)
-                    nextRenderMode = 0;
-            }
-
-            graphics.SetMode(RenderMode(nextRenderMode));
-        }
-
-        if (input.keyPress['2'])
-        {
             int quality = renderer.textureQuality;
             ++quality;
             if (quality > 2)
@@ -267,7 +248,7 @@ void HandleUpdate(StringHash eventType, VariantMap& eventData)
             renderer.textureQuality = quality;
         }
 
-        if (input.keyPress['3'])
+        if (input.keyPress['2'])
         {
             int quality = renderer.materialQuality;
             ++quality;
@@ -276,13 +257,13 @@ void HandleUpdate(StringHash eventType, VariantMap& eventData)
             renderer.materialQuality = quality;
         }
 
-        if (input.keyPress['4'])
+        if (input.keyPress['3'])
             renderer.specularLighting = !renderer.specularLighting;
 
-        if (input.keyPress['5'])
+        if (input.keyPress['4'])
             renderer.drawShadows = !renderer.drawShadows;
 
-        if (input.keyPress['6'])
+        if (input.keyPress['5'])
         {
             int size = renderer.shadowMapSize;
             size *= 2;
@@ -291,17 +272,17 @@ void HandleUpdate(StringHash eventType, VariantMap& eventData)
             renderer.shadowMapSize = size;
         }
 
-        if (input.keyPress['7'])
+        if (input.keyPress['6'])
             renderer.shadowMapHiresDepth = !renderer.shadowMapHiresDepth;
 
-        if (input.keyPress['8'])
+        if (input.keyPress['7'])
         {
             bool occlusion = renderer.maxOccluderTriangles > 0;
             occlusion = !occlusion;
             renderer.maxOccluderTriangles = occlusion ? 5000 : 0;
         }
         
-        if (input.keyPress['9'])
+        if (input.keyPress['8'])
             renderer.dynamicInstancing = !renderer.dynamicInstancing;
 
         if (input.keyPress[' '])
@@ -319,13 +300,13 @@ void HandleUpdate(StringHash eventType, VariantMap& eventData)
 
         if (input.keyPress[KEY_F5])
         {
-            File@ xmlFile = File(fileSystem.programDir + "Data/Scene.xml", FILE_WRITE);
+            File@ xmlFile = File("Data/Scene.xml", FILE_WRITE);
             testScene.SaveXML(xmlFile);
         }
 
         if (input.keyPress[KEY_F7])
         {
-            File@ xmlFile = File(fileSystem.programDir + "Data/Scene.xml", FILE_READ);
+            File@ xmlFile = File("Data/Scene.xml", FILE_READ);
             if (xmlFile.open)
                 testScene.LoadXML(xmlFile);
         }

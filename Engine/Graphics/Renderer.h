@@ -61,25 +61,17 @@ enum LightVSVariation
     MAX_LIGHT_VS_VARIATIONS
 };
 
-/// Light pixel shader variations.
+/// Forward rendering light pixel shader variations.
 enum LightPSVariation
 {
     LPS_NONE = 0,
     LPS_SPEC,
-    LPS_SHADOW,
-    LPS_SHADOWSPEC,
     LPS_SPOT,
     LPS_SPOTSPEC,
-    LPS_SPOTSHADOW,
-    LPS_SPOTSHADOWSPEC,
     LPS_POINT,
     LPS_POINTSPEC,
-    LPS_POINTSHADOW,
-    LPS_POINTSHADOWSPEC,
     LPS_POINTMASK,
     LPS_POINTMASKSPEC,
-    LPS_POINTMASKSHADOW,
-    LPS_POINTMASKSHADOWSPEC,
     MAX_LIGHT_PS_VARIATIONS
 };
 
@@ -98,34 +90,50 @@ enum DeferredLightPSVariation
 {
     DLPS_NONE = 0,
     DLPS_SPEC,
-    DLPS_SHADOW,
-    DLPS_SHADOWSPEC,
     DLPS_SPOT,
     DLPS_SPOTSPEC,
-    DLPS_SPOTSHADOW,
-    DLPS_SPOTSHADOWSPEC,
     DLPS_POINT,
     DLPS_POINTSPEC,
-    DLPS_POINTSHADOW,
-    DLPS_POINTSHADOWSPEC,
     DLPS_POINTMASK,
     DLPS_POINTMASKSPEC,
-    DLPS_POINTMASKSHADOW,
-    DLPS_POINTMASKSHADOWSPEC,
+    DLPS_HW,
+    DLPS_HWSPEC,
+    DLPS_HWSPOT,
+    DLPS_HWSPOTSPEC,
+    DLPS_HWPOINT,
+    DLPS_HWPOINTSPEC,
+    DLPS_HWPOINTMASK,
+    DLPS_HWPOINTMASKSPEC,
     DLPS_ORTHO,
     DLPS_ORTHOSPEC,
-    DLPS_ORTHOSHADOW,
-    DLPS_ORTHOSHADOWSPEC,
     DLPS_ORTHOSPOT,
     DLPS_ORTHOSPOTSPEC,
-    DLPS_ORTHOSPOTSHADOW,
-    DLPS_ORTHOSPOTSHADOWSPEC,
     DLPS_ORTHOPOINT,
     DLPS_ORTHOPOINTSPEC,
-    DLPS_ORTHOPOINTSHADOW,
-    DLPS_ORTHOPOINTSHADOWSPEC,
     DLPS_ORTHOPOINTMASK,
     DLPS_ORTHOPOINTMASKSPEC,
+    DLPS_SHADOW,
+    DLPS_SHADOWSPEC,
+    DLPS_SPOTSHADOW,
+    DLPS_SPOTSHADOWSPEC,
+    DLPS_POINTSHADOW,
+    DLPS_POINTSHADOWSPEC,
+    DLPS_POINTMASKSHADOW,
+    DLPS_POINTMASKSHADOWSPEC,
+    DLPS_HWSHADOW,
+    DLPS_HWSHADOWSPEC,
+    DLPS_HWSPOTSHADOW,
+    DLPS_HWSPOTSHADOWSPEC,
+    DLPS_HWPOINTSHADOW,
+    DLPS_HWPOINTSHADOWSPEC,
+    DLPS_HWPOINTMASKSHADOW,
+    DLPS_HWPOINTMASKSHADOWSPEC,
+    DLPS_ORTHOSHADOW,
+    DLPS_ORTHOSHADOWSPEC,
+    DLPS_ORTHOSPOTSHADOW,
+    DLPS_ORTHOSPOTSHADOWSPEC,
+    DLPS_ORTHOPOINTSHADOW,
+    DLPS_ORTHOPOINTSHADOWSPEC,
     DLPS_ORTHOPOINTMASKSHADOW,
     DLPS_ORTHOPOINTMASKSHADOWSPEC,
     MAX_DEFERRED_LIGHT_PS_VARIATIONS
@@ -191,10 +199,6 @@ public:
     void SetShadowMapSize(int size);
     /// %Set shadow map 24-bit depth on/off.
     void SetShadowMapHiresDepth(bool enable);
-    /// %Set reuse of shadowmaps. Default is true, disabling allows transparent geometry shadowing.
-    void SetReuseShadowMaps(bool enable);
-    /// %Set number of full, half and quarter size shadowmaps. Only has effect if reuse of shadowmaps is disabled first.
-    void SetNumShadowMaps(unsigned full, unsigned half, unsigned quarter);
     /// %Set dynamic instancing on/off.
     void SetDynamicInstancing(bool enable);
     /// %Set deferred rendering edge filter parameters.
@@ -225,14 +229,6 @@ public:
     int GetShadowMapSize() const { return shadowMapSize_; }
     /// Return whether shadow maps use 24-bit depth.
     bool GetShadowMapHiresDepth() const { return shadowMapHiresDepth_; }
-    /// Return whether shadow maps are reused.
-    bool GetReuseShadowMaps() const { return reuseShadowMaps_; }
-    /// Return number of full resolution shadow maps.
-    unsigned GetNumFullShadowMaps() const { return shadowMaps_[0].Size(); }
-    /// Return number of half resolution shadow maps.
-    unsigned GetNumHalfShadowMaps() const { return shadowMaps_[1].Size(); }
-    /// Return number of quarter resolution shadow maps.
-    unsigned GetNumQuarterShadowMaps() const { return shadowMaps_[2].Size(); }
     /// Return whether dynamic instancing is in use.
     bool GetDynamicInstancing() const { return dynamicInstancing_; }
     /// Return deferred rendering edge filter parameters.
@@ -296,20 +292,18 @@ private:
     Geometry* GetLightGeometry(Light* light);
     /// Return shadow map by resolution. If shadow map reuse is disabled, a different map is returned each time.
     Texture2D* GetShadowMap(float resolution);
-    /// Reset shadow map use count.
-    void ResetShadowMapUseCount();
     /// Get a shader program.
     ShaderVariation* GetShader(const String& name, const String& extension, bool checkExists) const;
-    /// Choose shaders for a batch.
-    void SetBatchShaders(Batch& batch, Technique* technique, Pass* pass, bool allowShadows = true);
-    /// Choose light volume shaders for a batch.
+    /// Choose forward lighting shaders for a batch.
+    void SetBatchShaders(Batch& batch, Technique* technique, Pass* pass);
+    /// Choose shaders for a deferred light volume batch.
     void SetLightVolumeShaders(Batch& batch);
     /// Reload shaders.
     void LoadShaders();
     /// Reload shaders for a material technique.
     void LoadMaterialShaders(Technique* technique);
     /// Reload shaders for a material pass.
-    void LoadPassShaders(Technique* technique, PassType pass, bool allowShadows = true);
+    void LoadPassShaders(Technique* technique, PassType type);
     /// Release shaders used in materials.
     void ReleaseMaterialShaders();
     /// Reload textures.
@@ -330,10 +324,6 @@ private:
     Light* CreateSplitLight(Light* original);
     /// Allocate a temporary scene node for attaching a split light or a shadow camera.
     Node* CreateTempNode();
-    /// %Set up a light volume rendering batch.
-    void SetupLightBatch(Batch& batch);
-    /// Draw a full screen quad (either near or far.)
-    void DrawFullScreenQuad(Camera& camera, ShaderVariation* vs, ShaderVariation* ps, bool nearQuad, const HashMap<StringHash, Vector4>& shaderParameters);
     /// Handle screen mode event.
     void HandleScreenMode(StringHash eventType, VariantMap& eventData);
     /// Handle render update event.
@@ -360,11 +350,9 @@ private:
     /// Default spotlight attenuation texture.
     SharedPtr<Texture2D> defaultLightSpot;
     /// Shadow maps by resolution.
-    Vector<SharedPtr<Texture2D> > shadowMaps_[NUM_SHADOWMAP_RESOLUTIONS];
+    SharedPtr<Texture2D> shadowMaps_[NUM_SHADOWMAP_RESOLUTIONS];
     /// Shadow map dummy color textures by resolution.
     SharedPtr<Texture2D> colorShadowMaps_[NUM_SHADOWMAP_RESOLUTIONS];
-    /// Shadow map use count if reusing is disabled. Is reset for each view.
-    unsigned shadowMapUseCount_[NUM_SHADOWMAP_RESOLUTIONS];
     /// Stencil rendering vertex shader.
     SharedPtr<ShaderVariation> stencilVS_;
     /// Stencil rendering pixel shader.

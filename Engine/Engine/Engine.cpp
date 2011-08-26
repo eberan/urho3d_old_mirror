@@ -71,10 +71,8 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
     if (initialized_)
         return true;
     
-    RenderMode mode = RENDER_FORWARD;
     int width = 0;
     int height = 0;
-    int multiSample = 1;
     int buffer = 100;
     int mixRate = 44100;
     bool fullscreen = true;
@@ -94,8 +92,6 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
             
             if (argument == "headless")
                 headless_ = true;
-            else if (argument == "deferred")
-                mode = RENDER_DEFERRED;
             else if (argument == "nolimit")
                 SetMaxFps(0);
             else if (argument == "nosound")
@@ -122,11 +118,6 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
                 case 'y':
                     if (arguments[i].Length() > 1)
                         height = ToInt(argument.Substring(1));
-                    break;
-                
-                case 'm':
-                    if (arguments[i].Length() > 1)
-                        multiSample = ToInt(argument.Substring(1));
                     break;
                     
                 case 'b':
@@ -192,7 +183,7 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
         graphics->SetFlushGPU(flush);
         graphics->SetForceSM2(forceSM2);
         graphics->SetWindowTitle(windowTitle);
-        if (!graphics->SetMode(mode, width, height, fullscreen, vsync, multiSample))
+        if (!graphics->SetMode(width, height, fullscreen, vsync))
             return false;
         if (!shadows)
             GetSubsystem<Renderer>()->SetDrawShadows(false);

@@ -8,17 +8,14 @@ sampler2D sEnvMap : register(S4);
 samplerCUBE sEnvCubeMap : register(S4);
 sampler2D sEmissiveMap : register(S5);
 
-// Shadow and light shape samplers
-sampler2D sShadowMap : register(S5);
-sampler1D sLightRampMap : register(S6);
-sampler2D sLightSpotMap : register(S7);
-samplerCUBE sLightCubeMap : register(S7);
-
-// Rendertarget samplers
-sampler2D sDiffBuffer : register(S0);
+// Lighting samplers
+sampler2D sShadowMap : register(S0);
 sampler2D sNormalBuffer : register(S1);
 sampler2D sDepthBuffer : register(S2);
 sampler2D sLightBuffer : register(S6);
+sampler1D sLightRampMap : register(S6);
+sampler2D sLightSpotMap : register(S7);
+samplerCUBE sLightCubeMap : register(S7);
 
 float4 Sample(sampler2D map, float2 texCoord)
 {
@@ -36,4 +33,15 @@ float3 UnpackNormal(float4 normalInput)
     normal.xy = normalInput.ag * 2.0 - 1.0;
     normal.z = sqrt(1.0 - dot(normal.xy, normal.xy));
     return normal;
+}
+
+float ReconstructDepth(float hwDepth)
+{
+    return cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x);
+}
+
+float GetIntensity(float3 color)
+{
+    const float3 dotValues = 1.0 / 3.0;
+    return dot(color, dotValues);
 }

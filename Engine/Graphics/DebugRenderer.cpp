@@ -216,7 +216,7 @@ void DebugRenderer::Render()
     graphics->SetColorWrite(true);
     graphics->SetCullMode(CULL_NONE);
     graphics->SetDepthWrite(true);
-    graphics->SetDepthTest(CMP_LESSEQUAL);
+    graphics->SetDepthTest(CMP_LESS);
     graphics->SetFillMode(FILL_SOLID);
     graphics->SetScissorTest(false);
     graphics->SetStencilTest(false);

@@ -26,13 +26,6 @@
 #include "HashBase.h"
 #include "StringHash.h"
 
-/// Rendering mode.
-enum RenderMode
-{
-    RENDER_FORWARD = 0,
-    RENDER_DEFERRED
-};
-
 /// Primitive type.
 enum PrimitiveType
 {
@@ -172,10 +165,10 @@ enum TextureUsage
 /// Rendering passes.
 enum PassType
 {
-    PASS_GBUFFER,
+    PASS_GBUFFER = 0,
     PASS_BASE,
     PASS_LIGHT,
-    PASS_EXTRA,
+    PASS_CUSTOM,
     PASS_SHADOW,
     MAX_PASSES
 };
@@ -207,7 +200,6 @@ extern StringHash VSP_ELAPSEDTIME;
 extern StringHash VSP_FRUSTUMSIZE;
 extern StringHash VSP_GBUFFEROFFSETS;
 extern StringHash VSP_MODEL;
-extern StringHash VSP_SHADOWPROJ;
 extern StringHash VSP_SPOTPROJ;
 extern StringHash VSP_VIEWPROJ;
 extern StringHash VSP_UOFFSET;
@@ -245,10 +237,10 @@ enum TextureUnit
     TU_ENVIRONMENT = 4,
     TU_EMISSIVE = 5,
     MAX_MATERIAL_TEXTURE_UNITS = 6,
-    TU_DIFFBUFFER = 0,
+    TU_SHADOWMAP = 0,
     TU_NORMALBUFFER = 1,
     TU_DEPTHBUFFER = 2,
-    TU_SHADOWMAP = 5,
+    TU_LIGHTBUFFER = 6,
     TU_LIGHTRAMP = 6,
     TU_LIGHTSPOT = 7,
     MAX_TEXTURE_UNITS = 8

@@ -1,4 +1,0 @@
-<shaders>
-    <shader name="Ambient" type="vs" />
-    <shader name="Ambient" type="ps" />
-</shaders>

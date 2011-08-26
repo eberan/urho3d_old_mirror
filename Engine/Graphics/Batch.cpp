@@ -262,25 +262,6 @@ void Batch::Prepare(Graphics* graphics, const HashMap<StringHash, Vector4>& shad
     
     if (shadowMap)
     {
-        if (graphics->NeedParameterUpdate(VSP_SHADOWPROJ, light_))
-        {
-            Camera* shadowCamera = light_->GetShadowCamera();
-            Matrix3x4 shadowView(shadowCamera->GetInverseWorldTransform());
-            Matrix4 shadowProj(shadowCamera->GetProjection());
-            Matrix4 texAdjust(Matrix4::IDENTITY);
-            
-            #ifdef USE_OPENGL
-            texAdjust.SetTranslation(Vector3(0.5f, 0.5f, 0.5f));
-            texAdjust.SetScale(Vector3(0.5f, 0.5f, 0.5f));
-            #else
-            float offset = 0.5f + 0.5f / (float)shadowMap->GetWidth();
-            texAdjust.SetTranslation(Vector3(offset, offset, 0.0f));
-            texAdjust.SetScale(Vector3(0.5f, -0.5f, 1.0f));
-            #endif
-            
-            graphics->SetShaderParameter(VSP_SHADOWPROJ, texAdjust * shadowProj * shadowView);
-        }
-        
         if (graphics->NeedParameterUpdate(PSP_SAMPLEOFFSETS, shadowMap))
         {
             float invWidth = 1.0f / (float)shadowMap->GetWidth();
@@ -350,8 +331,6 @@ void Batch::Prepare(Graphics* graphics, const HashMap<StringHash, Vector4>& shad
     // Set light-related textures
     if (light_)
     {
-        if (shadowMap && graphics->NeedTextureUnit(TU_SHADOWMAP))
-            graphics->SetTexture(TU_SHADOWMAP, shadowMap);
         if (graphics->NeedTextureUnit(TU_LIGHTRAMP))
             graphics->SetTexture(TU_LIGHTRAMP, light_->GetRampTexture());
         if (graphics->NeedTextureUnit(TU_LIGHTSPOT))

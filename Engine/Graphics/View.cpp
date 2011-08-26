@@ -88,10 +88,8 @@ bool View::Define(RenderSurface* renderTarget, const Viewport& viewport)
     if (!octree)
         return false;
     
-    mode_ = graphics_->GetRenderMode();
-    
-    // In deferred mode, check for the render texture being too large
-    if (mode_ != RENDER_FORWARD && renderTarget)
+    // Check for the render texture being too large
+    if (renderTarget)
     {
         if (renderTarget->GetWidth() > graphics_->GetWidth() || renderTarget->GetHeight() > graphics_->GetHeight())
         {
@@ -118,10 +116,7 @@ bool View::Define(RenderSurface* renderTarget, const Viewport& viewport)
         #ifdef USE_OPENGL
         depthStencil_ = renderTarget->GetLinkedDepthBuffer();
         #else
-        if (mode_ == RENDER_FORWARD)
-            depthStencil_ = renderTarget->GetLinkedDepthBuffer();
-        else
-            depthStencil_ = 0;
+        depthStencil_ = 0;
         #endif
     }
     
@@ -177,7 +172,7 @@ void View::Update(const FrameInfo& frame)
     shadowOccluders_.Clear();
     gBufferQueue_.Clear();
     baseQueue_.Clear();
-    extraQueue_.Clear();
+    customQueue_.Clear();
     transparentQueue_.Clear();
     noShadowLightQueue_.Clear();
     lightQueues_.Clear();
@@ -193,9 +188,6 @@ void View::Update(const FrameInfo& frame)
     
     // Reset projection jitter if was used last frame
     camera_->SetProjectionOffset(Vector2::ZERO);
-    
-    // Reset shadow map use count; they can be reused between views as each is rendered completely at a time
-    renderer_->ResetShadowMapUseCount();
     
     GetDrawables();
     GetBatches();
@@ -230,21 +222,7 @@ void View::Render()
     // Calculate view-global shader parameters
     CalculateShaderParameters();
     
-    // If not reusing shadowmaps, render all of them first
-    if (!renderer_->reuseShadowMaps_)
-    {
-        for (unsigned i = 0; i < lightQueues_.Size(); ++i)
-        {
-            LightBatchQueue& queue = lightQueues_[i];
-            if (queue.light_->GetShadowMap())
-                RenderShadowMap(queue);
-        }
-    }
-    
-    if (mode_ == RENDER_FORWARD)
-        RenderBatchesForward();
-    else
-        RenderBatchesDeferred();
+    RenderBatches();
     
     graphics_->SetViewTexture(0);
     
@@ -252,14 +230,11 @@ void View::Render()
     if (!renderTarget_)
     {
         Scene* scene = static_cast<Scene*>(octree_->GetNode());
-        if (scene)
+        DebugRenderer* debug = scene->GetComponent<DebugRenderer>();
+        if (debug)
         {
-            DebugRenderer* debug = scene->GetComponent<DebugRenderer>();
-            if (debug)
-            {
-                debug->SetView(camera_);
-                debug->Render();
-            }
+            debug->SetView(camera_);
+            debug->Render();
         }
     }
     
@@ -391,7 +366,7 @@ void View::GetBatches()
     HashSet<Drawable*> maxLightsDrawables;
     Map<Light*, unsigned> lightQueueIndex;
     
-    // Go through geometries for base pass batches
+    // Go through geometries for G-buffer or base pass batches
     {
         PROFILE(GetBaseBatches);
         for (unsigned i = 0; i < geometries_.Size(); ++i)
@@ -417,56 +392,49 @@ void View::GetBatches()
                 baseBatch.camera_ = camera_;
                 baseBatch.distance_ = drawable->GetDistance();
                 
-                Pass* pass = 0;
-                // In deferred mode, check for a G-buffer batch first
-                if (mode_ != RENDER_FORWARD)
-                {
-                    pass = tech->GetPass(PASS_GBUFFER);
-                    if (pass)
-                    {
-                        renderer_->SetBatchShaders(baseBatch, tech, pass);
-                        baseBatch.hasPriority_ = !pass->GetAlphaTest() && !pass->GetAlphaMask();
-                        gBufferQueue_.AddBatch(baseBatch);
-                        
-                        // Check also for an additional pass (possibly for emissive)
-                        pass = tech->GetPass(PASS_EXTRA);
-                        if (pass)
-                        {
-                            renderer_->SetBatchShaders(baseBatch, tech, pass);
-                            baseQueue_.AddBatch(baseBatch);
-                        }
-                        
-                        continue;
-                    }
-                }
-                
-                // Then check for forward rendering base pass
-                pass = tech->GetPass(PASS_BASE);
+                // Check for G-buffer & material passes first
+                Pass* pass = tech->GetPass(PASS_GBUFFER);
                 if (pass)
                 {
                     renderer_->SetBatchShaders(baseBatch, tech, pass);
-                    if (pass->GetBlendMode() == BLEND_REPLACE)
+                    baseBatch.hasPriority_ = !pass->GetAlphaTest() && !pass->GetAlphaMask();
+                    gBufferQueue_.AddBatch(baseBatch);
+                    
+                    pass = tech->GetPass(PASS_BASE);
+                    if (pass)
                     {
-                        baseBatch.hasPriority_ = !pass->GetAlphaTest() && !pass->GetAlphaMask();
+                        renderer_->SetBatchShaders(baseBatch, tech, pass);
+                        baseBatch.hasPriority_ = true;
                         baseQueue_.AddBatch(baseBatch);
                     }
-                    else
-                    {
-                        baseBatch.hasPriority_ = true;
-                        transparentQueue_.AddBatch(baseBatch, true);
-                    }
-                    continue;
                 }
                 else
                 {
-                    // If no base pass, finally check for extra / custom pass
-                    pass = tech->GetPass(PASS_EXTRA);
+                    // Then check for forward rendering base pass
+                    pass = tech->GetPass(PASS_BASE);
                     if (pass)
                     {
-                        baseBatch.hasPriority_ = false;
                         renderer_->SetBatchShaders(baseBatch, tech, pass);
-                        extraQueue_.AddBatch(baseBatch);
+                        if (pass->GetBlendMode() == BLEND_REPLACE)
+                        {
+                            baseBatch.hasPriority_ = false;
+                            baseQueue_.AddBatch(baseBatch);
+                        }
+                        else
+                        {
+                            baseBatch.hasPriority_ = true;
+                            transparentQueue_.AddBatch(baseBatch, true);
+                        }
                     }
+                }
+                
+                // Also check for extra / custom pass
+                pass = tech->GetPass(PASS_CUSTOM);
+                if (pass)
+                {
+                    baseBatch.hasPriority_ = false;
+                    renderer_->SetBatchShaders(baseBatch, tech, pass);
+                    customQueue_.AddBatch(baseBatch);
                 }
             }
         }
@@ -552,26 +520,23 @@ void View::GetBatches()
                     }
                     
                     // Store the light queue, and light volume batch in deferred mode
-                    if (mode_ != RENDER_FORWARD)
+                    Batch volumeBatch;
+                    volumeBatch.geometry_ = renderer_->GetLightGeometry(splitLight);
+                    volumeBatch.worldTransform_ = &splitLight->GetVolumeTransform(*camera_);
+                    volumeBatch.overrideView_ = splitLight->GetLightType() == LIGHT_DIRECTIONAL;
+                    volumeBatch.camera_ = camera_;
+                    volumeBatch.light_ = splitLight;
+                    volumeBatch.distance_ = splitLight->GetDistance();
+                    
+                    renderer_->SetLightVolumeShaders(volumeBatch);
+                    
+                    // If light is a split point light, it must be treated as shadowed in any case for correct stencil clearing
+                    if (splitLight->GetShadowMap() || splitLight->GetLightType() == LIGHT_SPLITPOINT)
+                        lightQueue.volumeBatches_.Push(volumeBatch);
+                    else
                     {
-                        Batch volumeBatch;
-                        volumeBatch.geometry_ = renderer_->GetLightGeometry(splitLight);
-                        volumeBatch.worldTransform_ = &splitLight->GetVolumeTransform(*camera_);
-                        volumeBatch.overrideView_ = splitLight->GetLightType() == LIGHT_DIRECTIONAL;
-                        volumeBatch.camera_ = camera_;
-                        volumeBatch.light_ = splitLight;
-                        volumeBatch.distance_ = splitLight->GetDistance();
-                        
-                        renderer_->SetLightVolumeShaders(volumeBatch);
-                        
-                        // If light is a split point light, it must be treated as shadowed in any case for correct stencil clearing
-                        if (splitLight->GetShadowMap() || splitLight->GetLightType() == LIGHT_SPLITPOINT)
-                            lightQueue.volumeBatches_.Push(volumeBatch);
-                        else
-                        {
-                            storeLightQueue = false;
-                            noShadowLightQueue_.AddBatch(volumeBatch, true);
-                        }
+                        storeLightQueue = false;
+                        noShadowLightQueue_.AddBatch(volumeBatch, true);
                     }
                     
                     if (storeLightQueue)
@@ -628,8 +593,6 @@ void View::GetLitBatches(Drawable* drawable, Light* light, Light* splitLight, Li
     HashSet<LitTransparencyCheck>& litTransparencies)
 {
     bool splitPointLight = splitLight->GetLightType() == LIGHT_SPLITPOINT;
-    // Whether to allow shadows for transparencies, or for forward lit objects in deferred mode
-    bool allowShadows = !renderer_->reuseShadowMaps_ && !splitPointLight;
     unsigned numBatches = drawable->GetNumBatches();
     
     for (unsigned i = 0; i < numBatches; ++i)
@@ -642,7 +605,7 @@ void View::GetLitBatches(Drawable* drawable, Light* light, Light* splitLight, Li
             continue;
         
         // If material uses opaque G-buffer rendering, skip
-        if (mode_ != RENDER_FORWARD && tech->HasPass(PASS_GBUFFER))
+        if (tech->HasPass(PASS_GBUFFER))
             continue;
         
         Pass* pass = 0;
@@ -665,19 +628,8 @@ void View::GetLitBatches(Drawable* drawable, Light* light, Light* splitLight, Li
         Pass* ambientPass = tech->GetPass(PASS_BASE);
         if (!ambientPass || ambientPass->GetBlendMode() == BLEND_REPLACE)
         {
-            if (mode_ == RENDER_FORWARD)
-            {
-                if (lightQueue)
-                {
-                    renderer_->SetBatchShaders(litBatch, tech, pass);
-                    lightQueue->litBatches_.AddBatch(litBatch);
-                }
-            }
-            else
-            {
-                renderer_->SetBatchShaders(litBatch, tech, pass, allowShadows);
-                baseQueue_.AddBatch(litBatch);
-            }
+            renderer_->SetBatchShaders(litBatch, tech, pass);
+            baseQueue_.AddBatch(litBatch);
         }
         else
         {
@@ -692,80 +644,15 @@ void View::GetLitBatches(Drawable* drawable, Light* light, Light* splitLight, Li
                 litTransparencies.Insert(check);
             }
             
-            renderer_->SetBatchShaders(litBatch, tech, pass, allowShadows);
+            renderer_->SetBatchShaders(litBatch, tech, pass);
             transparentQueue_.AddBatch(litBatch, true);
         }
     }
 }
 
-void View::RenderBatchesForward()
+void View::RenderBatches()
 {
-    {
-        // Render opaque objects' base passes
-        PROFILE(RenderBasePass);
-        
-        graphics_->SetColorWrite(true);
-        graphics_->SetStencilTest(false);
-        graphics_->SetRenderTarget(0, renderTarget_);
-        graphics_->SetDepthStencil(depthStencil_);
-        graphics_->SetViewport(screenRect_);
-        graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, zone_->GetFogColor());
-        
-        RenderBatchQueue(baseQueue_);
-    }
-    
-    {
-        // Render shadow maps + opaque objects' shadowed additive lighting
-        PROFILE(RenderLights);
-        
-        for (unsigned i = 0; i < lightQueues_.Size(); ++i)
-        {
-            LightBatchQueue& queue = lightQueues_[i];
-            
-            // If reusing shadowmaps, render each of them before the lit batches
-            if (renderer_->reuseShadowMaps_ && queue.light_->GetShadowMap())
-                RenderShadowMap(queue);
-            
-            graphics_->SetRenderTarget(0, renderTarget_);
-            graphics_->SetDepthStencil(depthStencil_);
-            graphics_->SetViewport(screenRect_);
-            
-            RenderForwardLightBatchQueue(queue.litBatches_, queue.light_);
-            
-            // Clear the stencil buffer after the last split
-            if (queue.lastSplit_)
-            {
-                LightType type = queue.light_->GetLightType();
-                if (type == LIGHT_SPLITPOINT || type == LIGHT_DIRECTIONAL)
-                    DrawSplitLightToStencil(*camera_, queue.light_, true);
-            }
-        }
-    }
-    
-    graphics_->SetRenderTarget(0, renderTarget_);
-    graphics_->SetDepthStencil(depthStencil_);
-    graphics_->SetViewport(screenRect_);
-    
-    if (!extraQueue_.IsEmpty())
-    {
-        // Render extra / custom passes
-        PROFILE(RenderExtraPass);
-        
-        RenderBatchQueue(extraQueue_);
-    }
-    
-    if (!transparentQueue_.IsEmpty())
-    {
-        // Render transparent objects last (both base passes & additive lighting)
-        PROFILE(RenderTransparent);
-        
-        RenderBatchQueue(transparentQueue_, true);
-    }
-}
-
-void View::RenderBatchesDeferred()
-{
-    Texture2D* diffBuffer = graphics_->GetDiffBuffer();
+    Texture2D* lightBuffer = graphics_->GetLightBuffer();
     Texture2D* normalBuffer = graphics_->GetNormalBuffer();
     Texture2D* depthBuffer = graphics_->GetDepthBuffer();
     
@@ -778,31 +665,32 @@ void View::RenderBatchesDeferred()
     camera_->GetFrustumSize(nearVector, farVector);
     Vector4 viewportParams(farVector.x_, farVector.y_, farVector.z_, 0.0f);
     
-    float gBufferWidth = (float)diffBuffer->GetWidth();
-    float gBufferHeight = (float)diffBuffer->GetHeight();
+    float gBufferWidth = (float)lightBuffer->GetWidth();
+    float gBufferHeight = (float)lightBuffer->GetHeight();
     float widthRange = 0.5f * width_ / gBufferWidth;
     float heightRange = 0.5f * height_ / gBufferHeight;
     
     #ifdef USE_OPENGL
     Vector4 bufferUVOffset(((float)screenRect_.left_) / gBufferWidth + widthRange,
         ((float)screenRect_.top_) / gBufferHeight + heightRange, widthRange, heightRange);
+    #else
+    Vector4 bufferUVOffset((0.5f + (float)screenRect_.left_) / gBufferWidth + widthRange,
+        (0.5f + (float)screenRect_.top_) / gBufferHeight + heightRange, widthRange, heightRange);
+    #endif
+    
     // Hardware depth is non-linear in perspective views, so calculate the depth reconstruction parameters
     float farClip = camera_->GetFarClip();
     float nearClip = camera_->GetNearClip();
     Vector4 depthReconstruct = Vector4::ZERO;
     depthReconstruct.x_ = farClip / (farClip - nearClip);
     depthReconstruct.y_ = -nearClip / (farClip - nearClip);
-    shaderParameters_[PSP_DEPTHRECONSTRUCT] = depthReconstruct;
-    #else
-    Vector4 bufferUVOffset((0.5f + (float)screenRect_.left_) / gBufferWidth + widthRange,
-        (0.5f + (float)screenRect_.top_) / gBufferHeight + heightRange, widthRange, heightRange);
-    #endif
     
     Vector4 viewportSize((float)screenRect_.left_ / gBufferWidth, (float)screenRect_.top_ / gBufferHeight,
         (float)screenRect_.right_ / gBufferWidth, (float)screenRect_.bottom_ / gBufferHeight);
     
     shaderParameters_[VSP_FRUSTUMSIZE] = viewportParams;
     shaderParameters_[VSP_GBUFFEROFFSETS] = bufferUVOffset;
+    shaderParameters_[PSP_DEPTHRECONSTRUCT] = depthReconstruct;
     
     {
         // Clear and render the G-buffer
@@ -813,144 +701,121 @@ void View::RenderBatchesDeferred()
         graphics_->SetStencilTest(false);
         #ifdef USE_OPENGL
         // On OpenGL, clear the diffuse and depth buffers normally
-        graphics_->SetRenderTarget(0, diffBuffer);
+        graphics_->SetRenderTarget(0, normalBuffer);
         graphics_->SetDepthStencil(depthBuffer);
-        graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL);
+        graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL);
         graphics_->SetRenderTarget(1, normalBuffer);
         #else
-        // On Direct3D9, clear only depth and stencil at first (fillrate optimization)
-        graphics_->SetRenderTarget(0, diffBuffer);
-        graphics_->SetRenderTarget(1, normalBuffer);
-        graphics_->SetRenderTarget(2, depthBuffer);
-        graphics_->SetDepthStencil(depthStencil_);
-        graphics_->SetViewport(screenRect_);
-        graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL);
+        // If using hardware depth, do not clear color at all. Else clear the depth rendertarget to far depth
+        if (graphics_->GetHardwareDepthSupport())
+        {
+            graphics_->SetRenderTarget(0, normalBuffer);
+            graphics_->SetDepthStencil(depthStencil_);
+            graphics_->SetViewport(screenRect_);
+            graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL);
+        }
+        else
+        {
+            graphics_->SetRenderTarget(0, depthBuffer);
+            graphics_->SetDepthStencil(depthStencil_);
+            graphics_->SetViewport(screenRect_);
+            graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::WHITE);
+            graphics_->SetRenderTarget(1, normalBuffer);
+        }
         #endif
         
         RenderBatchQueue(gBufferQueue_);
-        
-        graphics_->SetAlphaTest(false);
-        graphics_->SetBlendMode(BLEND_REPLACE);
-        
-        #ifndef USE_OPENGL
-        // On Direct3D9, clear now the parts of G-Buffer that were not rendered into
-        graphics_->SetDepthTest(CMP_LESSEQUAL);
-        graphics_->SetDepthWrite(false);
-        graphics_->ResetRenderTarget(2);
-        graphics_->SetRenderTarget(1, depthBuffer);
-        
-        renderer_->DrawFullScreenQuad(*camera_, renderer_->GetVertexShader("GBufferFill"),
-            renderer_->GetPixelShader("GBufferFill"), false, shaderParameters_);
-        #endif
-    }
-    
-    {
-        PROFILE(RenderAmbientQuad);
-        
-        // Render ambient color & fog. On OpenGL the depth buffer will be copied now
-        graphics_->SetDepthTest(CMP_ALWAYS);
-        graphics_->SetRenderTarget(0, renderBuffer);
-        graphics_->ResetRenderTarget(1);
-        #ifdef USE_OPENGL
-        graphics_->SetDepthWrite(true);
-        #else
-        graphics_->ResetRenderTarget(2);
-        #endif
-        graphics_->SetDepthStencil(depthStencil_);
-        graphics_->SetViewport(screenRect_);
-        graphics_->SetTexture(TU_DIFFBUFFER, diffBuffer);
-        graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
-        
-        String pixelShaderName = "Ambient";
-        #ifdef USE_OPENGL
-        if (camera_->IsOrthographic())
-            pixelShaderName += "Ortho";
-        // On OpenGL, set up a stencil operation to reset the stencil during ambient quad rendering
-        graphics_->SetStencilTest(true, CMP_ALWAYS, OP_ZERO, OP_KEEP, OP_KEEP);
-        #endif
-        
-        renderer_->DrawFullScreenQuad(*camera_, renderer_->GetVertexShader("Ambient"),
-            renderer_->GetPixelShader("Ambient"), false, shaderParameters_);
-        
-        #ifdef USE_OPENGL
-        graphics_->SetStencilTest(false);
-        #endif
     }
     
     {
         // Render lights
         PROFILE(RenderLights);
         
+        Color ambient = 0.5f * zone_->GetAmbientColor();
+        ambient.a_ = 0.0f; // Initial specular value
+        
+        graphics_->SetRenderTarget(0, lightBuffer);
+        graphics_->ResetRenderTarget(1);
+        graphics_->SetDepthStencil(depthStencil_);
+        graphics_->SetViewport(screenRect_);
+        graphics_->Clear(CLEAR_COLOR, ambient);
+        
         // Shadowed lights
         for (unsigned i = 0; i < lightQueues_.Size(); ++i)
         {
             LightBatchQueue& queue = lightQueues_[i];
             
-            // If reusing shadowmaps, render each of them before the lit batches
-            if (renderer_->reuseShadowMaps_ && queue.light_->GetShadowMap())
+            // Render shadowmap first
+            if (queue.light_->GetShadowMap())
                 RenderShadowMap(queue);
             
             // Light volume batches are not sorted as there should be only one of them
             if (queue.volumeBatches_.Size())
             {
-                graphics_->SetRenderTarget(0, renderBuffer);
+                graphics_->SetRenderTarget(0, lightBuffer);
                 graphics_->SetDepthStencil(depthStencil_);
                 graphics_->SetViewport(screenRect_);
-                graphics_->SetTexture(TU_DIFFBUFFER, diffBuffer);
+                graphics_->SetTexture(TU_SHADOWMAP, queue.light_->GetShadowMap());
                 graphics_->SetTexture(TU_NORMALBUFFER, normalBuffer);
                 graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
                 
                 for (unsigned j = 0; j < queue.volumeBatches_.Size(); ++j)
                 {
-                    renderer_->SetupLightBatch(queue.volumeBatches_[j]);
+                    SetupLightBatch(queue.volumeBatches_[j]);
                     queue.volumeBatches_[j].Draw(graphics_, shaderParameters_);
                 }
                 
-                // If was the last split of a split point light, clear the stencil by rendering the point light again
+                // If was the last split of a split point light, clear the stencil with a scissored clear
                 if (queue.lastSplit_ && queue.light_->GetLightType() == LIGHT_SPLITPOINT)
-                    DrawSplitLightToStencil(*camera_, queue.light_, true);
+                {
+                    OptimizeLightByScissor(queue.light_->GetOriginalLight());
+                    graphics_->Clear(CLEAR_STENCIL);
+                    graphics_->SetScissorTest(false);
+                }
             }
         }
         
         // Non-shadowed lights
         if (noShadowLightQueue_.sortedBatches_.Size())
         {
-            graphics_->SetRenderTarget(0, renderBuffer);
+            graphics_->SetRenderTarget(0, lightBuffer);
             graphics_->SetDepthStencil(depthStencil_);
             graphics_->SetViewport(screenRect_);
-            graphics_->SetTexture(TU_DIFFBUFFER, diffBuffer);
             graphics_->SetTexture(TU_NORMALBUFFER, normalBuffer);
             graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
+            graphics_->SetTexture(TU_SHADOWMAP, 0);
             
             for (unsigned i = 0; i < noShadowLightQueue_.sortedBatches_.Size(); ++i)
             {
-                renderer_->SetupLightBatch(*noShadowLightQueue_.sortedBatches_[i]);
+                SetupLightBatch(*noShadowLightQueue_.sortedBatches_[i]);
                 noShadowLightQueue_.sortedBatches_[i]->Draw(graphics_, shaderParameters_);
             }
         }
     }
     
     {
-        // Render base passes
+        // Render deferred and forward base passes
         PROFILE(RenderBasePass);
         
         graphics_->SetStencilTest(false);
-        graphics_->SetTexture(TU_DIFFBUFFER, 0);
         graphics_->SetTexture(TU_NORMALBUFFER, 0);
         graphics_->SetTexture(TU_DEPTHBUFFER, 0);
+        graphics_->SetTexture(TU_SHADOWMAP, 0);
         graphics_->SetRenderTarget(0, renderBuffer);
         graphics_->SetDepthStencil(depthStencil_);
         graphics_->SetViewport(screenRect_);
+        graphics_->Clear(CLEAR_COLOR, zone_->GetFogColor());
         
+        graphics_->SetTexture(TU_LIGHTBUFFER, lightBuffer);
         RenderBatchQueue(baseQueue_, true);
     }
     
-    if (!extraQueue_.IsEmpty())
+    if (!customQueue_.IsEmpty())
     {
         // Render extra / custom passes
         PROFILE(RenderExtraPass);
         
-        RenderBatchQueue(extraQueue_);
+        RenderBatchQueue(customQueue_);
     }
     
     if (!transparentQueue_.IsEmpty())
@@ -969,10 +834,10 @@ void View::RenderBatchesDeferred()
         const EdgeFilterParameters& parameters = renderer_->GetEdgeFilter();
         ShaderVariation* vs = renderer_->GetVertexShader("EdgeFilter");
         ShaderVariation* ps = renderer_->GetPixelShader("EdgeFilter");
-        
-        HashMap<StringHash, Vector4> shaderParameters(shaderParameters_);
-        shaderParameters[PSP_EDGEFILTERPARAMS] = Vector4(parameters.radius_, parameters.threshold_, parameters.strength_, 0.0f);
-        shaderParameters[PSP_SAMPLEOFFSETS] = Vector4(1.0f / gBufferWidth, 1.0f / gBufferHeight, 0.0f, 0.0f);
+        graphics_->SetShaders(vs, ps);
+        graphics_->SetShaderParameter(PSP_EDGEFILTERPARAMS, Vector4(parameters.radius_, parameters.threshold_, parameters.strength_, 0.0f));
+        graphics_->SetShaderParameter(PSP_SAMPLEOFFSETS, Vector4(1.0f / gBufferWidth, 1.0f / gBufferHeight, 0.0f, 0.0f));
+        graphics_->ClearParameterSource(PSP_SAMPLEOFFSETS);
         
         graphics_->SetAlphaTest(false);
         graphics_->SetBlendMode(BLEND_REPLACE);
@@ -981,8 +846,8 @@ void View::RenderBatchesDeferred()
         graphics_->SetRenderTarget(0, renderTarget_);
         graphics_->SetDepthStencil(depthStencil_);
         graphics_->SetViewport(screenRect_);
-        graphics_->SetTexture(TU_DIFFBUFFER, graphics_->GetScreenBuffer());
-        renderer_->DrawFullScreenQuad(*camera_, vs, ps, false, shaderParameters);
+        graphics_->SetTexture(TU_DIFFUSE, graphics_->GetScreenBuffer());
+        DrawFullscreenQuad(*camera_, false);
     }
 }
 
@@ -1866,14 +1731,10 @@ void View::SortBatches()
 {
     PROFILE(SortBatches);
     
-    if (mode_ != RENDER_FORWARD)
-    {
-        gBufferQueue_.SortFrontToBack();
-        noShadowLightQueue_.SortFrontToBack();
-    }
-    
+    gBufferQueue_.SortFrontToBack();
+    noShadowLightQueue_.SortFrontToBack();
     baseQueue_.SortFrontToBack();
-    extraQueue_.SortFrontToBack();
+    customQueue_.SortFrontToBack();
     transparentQueue_.SortBackToFront();
     
     for (unsigned i = 0; i < lightQueues_.Size(); ++i)
@@ -1889,10 +1750,9 @@ void View::PrepareInstancingBuffer()
     
     unsigned totalInstances = 0;
     
-    if (mode_ != RENDER_FORWARD)
-        totalInstances += gBufferQueue_.GetNumInstances();
+    totalInstances += gBufferQueue_.GetNumInstances();
     totalInstances += baseQueue_.GetNumInstances();
-    totalInstances += extraQueue_.GetNumInstances();
+    totalInstances += customQueue_.GetNumInstances();
     
     for (unsigned i = 0; i < lightQueues_.Size(); ++i)
     {
@@ -1907,10 +1767,9 @@ void View::PrepareInstancingBuffer()
         void* lockedData = renderer_->instancingBuffer_->Lock(0, totalInstances, LOCK_DISCARD);
         if (lockedData)
         {
-            if (mode_ != RENDER_FORWARD)
-                gBufferQueue_.SetTransforms(lockedData, freeIndex);
+            gBufferQueue_.SetTransforms(lockedData, freeIndex);
             baseQueue_.SetTransforms(lockedData, freeIndex);
-            extraQueue_.SetTransforms(lockedData, freeIndex);
+            customQueue_.SetTransforms(lockedData, freeIndex);
             
             for (unsigned i = 0; i < lightQueues_.Size(); ++i)
             {
@@ -1945,98 +1804,136 @@ void View::CalculateShaderParameters()
     shaderParameters_[PSP_FOGPARAMS] = fogParams;
 }
 
-void View::DrawSplitLightToStencil(Camera& camera, Light* light, bool clear)
+
+void View::SetupLightBatch(Batch& batch)
 {
-    Matrix3x4 view(camera.GetInverseWorldTransform());
+    Matrix3x4 view(batch.camera_->GetInverseWorldTransform());
     
-    switch (light->GetLightType())
+    Light* light = batch.light_;
+    float lightExtent = light->GetVolumeExtent();
+    float lightViewDist = (light->GetWorldPosition() - batch.camera_->GetWorldPosition()).LengthFast();
+    
+    graphics_->SetAlphaTest(false);
+    graphics_->SetBlendMode(BLEND_ADD);
+    graphics_->SetDepthWrite(false);
+    
+    if (light->GetLightType() == LIGHT_DIRECTIONAL)
     {
-    case LIGHT_SPLITPOINT:
-        if (!clear)
+        // Get projection without jitter offset to ensure the whole screen is filled
+        Matrix4 projection(batch.camera_->GetProjection(false));
+        
+        // If the light does not extend to the near plane, use a stencil test. Else just draw with depth fail
+        if (light->GetNearSplit() <= batch.camera_->GetNearClip())
         {
-            Matrix4 projection(camera.GetProjection());
-            const Matrix3x4& model = light->GetVolumeTransform(camera);
-            float lightExtent = light->GetVolumeExtent();
-            float lightViewDist = (light->GetWorldPosition() - camera.GetWorldPosition()).LengthFast();
-            bool drawBackFaces = lightViewDist < (lightExtent + camera.GetNearClip());
+            graphics_->SetCullMode(CULL_NONE);
+            graphics_->SetDepthTest(CMP_GREATER);
+            graphics_->SetStencilTest(false);
+        }
+        else
+        {
+            Matrix3x4 nearTransform = light->GetDirLightTransform(*batch.camera_, true);
             
-            graphics_->SetAlphaTest(false);
+            // Set state for stencil rendering
             graphics_->SetColorWrite(false);
-            graphics_->SetDepthWrite(false);
-            graphics_->SetCullMode(drawBackFaces ? CULL_CW : CULL_CCW);
-            graphics_->SetDepthTest(drawBackFaces ? CMP_GREATER : CMP_LESS);
+            graphics_->SetCullMode(CULL_NONE);
+            graphics_->SetDepthTest(CMP_LESSEQUAL);
+            graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
             graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
-            graphics_->SetShaderParameter(VSP_MODEL, model);
-            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
+            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection);
+            graphics_->SetShaderParameter(VSP_MODEL, nearTransform);
             graphics_->ClearTransformSources();
             
-            // Draw the faces to stencil which we should draw (where no light has been rendered yet)
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_INCR, OP_KEEP, OP_KEEP, 0);
-            renderer_->spotLightGeometry_->Draw(graphics_);
+            // Draw to stencil
+            batch.geometry_->Draw(graphics_);
             
-            // Draw the other faces to stencil to mark where we should not draw ("frees up" the pixels for other faces)
-            graphics_->SetCullMode(drawBackFaces ? CULL_CCW : CULL_CW);
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_DECR, OP_KEEP, OP_KEEP, 1);
-            renderer_->spotLightGeometry_->Draw(graphics_);
-            
-            // Now set stencil test for rendering the lit geometries (also marks the pixels so that they will not be used again)
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_INCR, OP_KEEP, OP_KEEP, 1);
+            // Re-enable color write, set test for rendering the actual light
             graphics_->SetColorWrite(true);
+            graphics_->SetDepthTest(CMP_GREATER);
+            graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
         }
-        else
-        {
-            // Clear stencil with a scissored clear operation
-            OptimizeLightByScissor(light->GetOriginalLight());
-            graphics_->Clear(CLEAR_STENCIL);
-            graphics_->SetScissorTest(false);
-            graphics_->SetStencilTest(false);
-        }
-        break;
+    }
+    else
+    {
+        Matrix4 projection(batch.camera_->GetProjection());
+        const Matrix3x4& model = light->GetVolumeTransform(*batch.camera_);
         
-    case LIGHT_DIRECTIONAL:
-        // If light encompasses whole frustum, no drawing to stencil necessary
-        if (light->GetNearSplit() <= camera.GetNearClip() && light->GetFarSplit() >= camera.GetFarClip())
+        if (light->GetLightType() == LIGHT_SPLITPOINT)
         {
-            graphics_->SetStencilTest(false);
-            return;
+            // Shadowed point light, split in 6 frustums: mask out overlapping pixels to prevent overlighting
+            // Check whether we should draw front or back faces
+            bool drawBackFaces = lightViewDist < (lightExtent + batch.camera_->GetNearClip());
+            graphics_->SetColorWrite(false);
+            graphics_->SetCullMode(drawBackFaces ? CULL_CCW : CULL_CW);
+            graphics_->SetDepthTest(drawBackFaces ? CMP_GREATER : CMP_LESS);
+            graphics_->SetStencilTest(true, CMP_EQUAL, OP_INCR, OP_KEEP, OP_KEEP, 0);
+            graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
+            graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
+            graphics_->SetShaderParameter(VSP_MODEL, model);
+            
+            // Draw the other faces to stencil to mark where we should not draw
+            batch.geometry_->Draw(graphics_);
+            
+            graphics_->SetColorWrite(true);
+            graphics_->SetCullMode(drawBackFaces ? CULL_CW : CULL_CCW);
+            graphics_->SetStencilTest(true, CMP_EQUAL, OP_DECR, OP_DECR, OP_KEEP, 0);
         }
         else
         {
-            if (!clear)
+            // If light is close to near clip plane, we might be inside light volume
+            if (lightViewDist < (lightExtent + batch.camera_->GetNearClip()))
             {
-                // Get projection without jitter offset to ensure the whole screen is filled
-                Matrix4 projection(camera.GetProjection(false));
-                Matrix3x4 nearTransform(light->GetDirLightTransform(camera, true));
-                Matrix3x4 farTransform(light->GetDirLightTransform(camera, false));
-                
-                graphics_->SetAlphaTest(false);
-                graphics_->SetColorWrite(false);
-                graphics_->SetDepthWrite(false);
-                graphics_->SetCullMode(CULL_NONE);
-                
-                // If the split begins at the near plane (first split), draw at split far plane, otherwise at near plane
-                bool firstSplit = light->GetNearSplit() <= camera.GetNearClip();
-                graphics_->SetDepthTest(firstSplit ? CMP_GREATER : CMP_LESS);
-                graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
-                graphics_->SetShaderParameter(VSP_MODEL, firstSplit ? farTransform : nearTransform);
-                graphics_->SetShaderParameter(VSP_VIEWPROJ, projection);
-                graphics_->SetStencilTest(true, CMP_ALWAYS, OP_REF, OP_ZERO, OP_ZERO, 1);
-                graphics_->ClearTransformSources();
-                
-                renderer_->dirLightGeometry_->Draw(graphics_);
-                graphics_->SetColorWrite(true);
-                graphics_->SetStencilTest(true, CMP_EQUAL, OP_KEEP, OP_KEEP, OP_KEEP, 1);
+                // In this case reverse cull mode & depth test and render back faces
+                graphics_->SetCullMode(CULL_CW);
+                graphics_->SetDepthTest(CMP_GREATER);
+                graphics_->SetStencilTest(false);
             }
             else
             {
-                // Clear the whole stencil
-                graphics_->SetScissorTest(false);
-                graphics_->Clear(CLEAR_STENCIL);
-                graphics_->SetStencilTest(false);
+                // If not too close to far clip plane, write the back faces to stencil for optimization,
+                // then render front faces. Else just render front faces.
+                if (lightViewDist < (batch.camera_->GetFarClip() - lightExtent))
+                {
+                    // Set state for stencil rendering
+                    graphics_->SetColorWrite(false);
+                    graphics_->SetCullMode(CULL_CW);
+                    graphics_->SetDepthTest(CMP_GREATER);
+                    graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
+                    graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
+                    graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
+                    graphics_->SetShaderParameter(VSP_MODEL, model);
+                    
+                    // Draw to stencil
+                    batch.geometry_->Draw(graphics_);
+                    
+                    // Re-enable color write, set test for rendering the actual light
+                    graphics_->SetColorWrite(true);
+                    graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
+                    graphics_->SetCullMode(CULL_CCW);
+                    graphics_->SetDepthTest(CMP_LESS);
+                }
+                else
+                {
+                    graphics_->SetStencilTest(false);
+                    graphics_->SetCullMode(CULL_CCW);
+                    graphics_->SetDepthTest(CMP_LESS);
+                }
             }
         }
-        break;
     }
+}
+
+void View::DrawFullscreenQuad(Camera& camera, bool nearQuad)
+{
+    Light quadDirLight(context_);
+    Matrix3x4 model(quadDirLight.GetDirLightTransform(camera, nearQuad));
+    
+    graphics_->SetCullMode(CULL_NONE);
+    graphics_->SetShaderParameter(VSP_MODEL, model);
+    // Get projection without jitter offset to ensure the whole screen is filled
+    graphics_->SetShaderParameter(VSP_VIEWPROJ, camera.GetProjection(false));
+    graphics_->ClearTransformSources();
+    
+    renderer_->dirLightGeometry_->Draw(graphics_);
 }
 
 void View::RenderBatchQueue(const BatchQueue& queue, bool useScissor, bool disableScissor)
@@ -2083,53 +1980,6 @@ void View::RenderBatchQueue(const BatchQueue& queue, bool useScissor, bool disab
             OptimizeLightByScissor(batch->light_);
         else
             graphics_->SetScissorTest(false);
-        batch->Draw(graphics_, shaderParameters_);
-    }
-}
-
-void View::RenderForwardLightBatchQueue(const BatchQueue& queue, Light* light)
-{
-    VertexBuffer* instancingBuffer = 0;
-    if (renderer_->GetDynamicInstancing())
-        instancingBuffer = renderer_->instancingBuffer_;
-    
-    graphics_->SetScissorTest(false);
-    graphics_->SetStencilTest(false);
-    
-    // Priority instanced
-    for (Map<BatchGroupKey, BatchGroup>::ConstIterator i = queue.priorityBatchGroups_.Begin(); i !=
-        queue.priorityBatchGroups_.End(); ++i)
-    {
-        const BatchGroup& group = i->second_;
-        group.Draw(graphics_, instancingBuffer, shaderParameters_);
-    }
-    // Priority non-instanced
-    for (PODVector<Batch*>::ConstIterator i = queue.sortedPriorityBatches_.Begin(); i != queue.sortedPriorityBatches_.End(); ++i)
-    {
-        Batch* batch = *i;
-        batch->Draw(graphics_, shaderParameters_);
-    }
-    
-    // All base passes have been drawn. Optimize at this point by both scissor and stencil
-    if (light)
-    {
-        OptimizeLightByScissor(light);
-        LightType type = light->GetLightType();
-        if (type == LIGHT_SPLITPOINT || type == LIGHT_DIRECTIONAL)
-            DrawSplitLightToStencil(*camera_, light);
-    }
-    
-    // Non-priority instanced
-    for (Map<BatchGroupKey, BatchGroup>::ConstIterator i = queue.batchGroups_.Begin(); i !=
-        queue.batchGroups_.End(); ++i)
-    {
-        const BatchGroup& group = i->second_;
-        group.Draw(graphics_, instancingBuffer, shaderParameters_);
-    }
-    // Non-priority non-instanced
-    for (PODVector<Batch*>::ConstIterator i = queue.sortedBatches_.Begin(); i != queue.sortedBatches_.End(); ++i)
-    {
-        Batch* batch = *i;
         batch->Draw(graphics_, shaderParameters_);
     }
 }

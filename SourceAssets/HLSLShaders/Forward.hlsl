@@ -26,11 +26,8 @@ void VS(float4 iPos : POSITION,
         out float3 oTangent : TEXCOORD3,
         out float3 oBitangent : TEXCOORD4,
     #endif
-    #ifdef SHADOW
-        out float4 oShadowPos : TEXCOORD5,
-    #endif
     #ifdef SPOTLIGHT
-        out float4 oSpotPos : TEXCOORD6,
+        out float4 oSpotPos : TEXCOORD5,
     #endif
     #ifdef VERTEXCOLOR
         float4 iColor : COLOR0,
@@ -67,10 +64,6 @@ void VS(float4 iPos : POSITION,
     // Store adjusted world position and linear depth for light calculations
     oWorldPos = float4(pos.xyz - cCameraPos, GetDepth(oPos));
 
-    #ifdef SHADOW
-        // Shadow projection: transform from world space to shadow space
-        oShadowPos = mul(pos, cShadowProj);
-    #endif
     #ifdef SPOTLIGHT
         // Spotlight projection: transform from world space to projector texture coordinates
         oSpotPos = mul(pos, cSpotProj);
@@ -96,11 +89,8 @@ void PS(float2 iTexCoord : TEXCOORD0,
     #else
         float3 iNormal : TEXCOORD2,
     #endif
-    #if defined(SHADOW)
-        float4 iShadowPos : TEXCOORD5,
-    #endif
     #ifdef SPOTLIGHT
-        float4 iSpotPos : TEXCOORD6,
+        float4 iSpotPos : TEXCOORD5,
     #endif
     #ifdef VERTEXCOLOR
         float4 iColor : COLOR0,
@@ -135,10 +125,6 @@ void PS(float2 iTexCoord : TEXCOORD0,
             diff = GetDiffuseDir(normal, lightDir) * GetSplitFade(iWorldPos.w);
         #else
             diff = GetDiffusePointOrSpot(normal, iWorldPos.xyz, lightDir, lightVec);
-        #endif
-
-        #ifdef SHADOW
-            diff *= GetShadow(iShadowPos);
         #endif
 
         #ifdef SPOTLIGHT

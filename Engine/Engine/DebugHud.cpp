@@ -115,12 +115,6 @@ void DebugHud::Update(float timeStep)
     {
         String mode;
         
-        RenderMode renderMode = graphics->GetRenderMode();
-        if (renderMode == RENDER_FORWARD)
-            mode = "Forward";
-        else
-            mode = "Deferred";
-        
         int textureQuality = renderer->GetTextureQuality();
         mode += " Tex:";
         if (textureQuality == 0)

@@ -139,10 +139,8 @@ private:
     void GetBatches();
     /// Get lit batches for a certain light and drawable.
     void GetLitBatches(Drawable* drawable, Light* light, Light* SplitLight, LightBatchQueue* lightQueue, HashSet<LitTransparencyCheck>& litTransparencies);
-    /// Render batches, forward mode.
-    void RenderBatchesForward();
-    /// Render batches, deferred mode.
-    void RenderBatchesDeferred();
+    /// Render batches.
+    void RenderBatches();
     /// Query for occluders as seen from a camera.
     void UpdateOccluders(PODVector<Drawable*>& occluders, Camera* camera);
     /// Draw occluders to occlusion buffer.
@@ -175,12 +173,12 @@ private:
     void PrepareInstancingBuffer();
     /// Calculate view-global shader parameters.
     void CalculateShaderParameters();
-    /// Draw a split light to stencil buffer.
-    void DrawSplitLightToStencil(Camera& camera, Light* light, bool clear = false);
+    /// %Set up a light volume rendering batch.
+    void SetupLightBatch(Batch& batch);
+    /// Draw a full screen quad (either near or far.) Shaders must have been set beforehand.
+    void DrawFullscreenQuad(Camera& camera, bool nearQuad);
     /// Draw everything in a batch queue, priority batches first.
     void RenderBatchQueue(const BatchQueue& queue, bool useScissor = false, bool disableScissor = true);
-    /// Draw a forward (shadowed) light batch queue.
-    void RenderForwardLightBatchQueue(const BatchQueue& queue, Light* forwardQueueLight);
     /// Render a shadow map.
     void RenderShadowMap(const LightBatchQueue& queue);
     
@@ -204,8 +202,6 @@ private:
     int width_;
     /// Render target height.
     int height_;
-    /// Rendering mode.
-    RenderMode mode_;
     /// Draw shadows flag.
     bool drawShadows_;
     /// Material quality level.
@@ -248,7 +244,7 @@ private:
     /// Base pass batches.
     BatchQueue baseQueue_;
     /// Extra pass batches.
-    BatchQueue extraQueue_;
+    BatchQueue customQueue_;
     /// Transparent geometry batches.
     BatchQueue transparentQueue_;
     /// Unshadowed light volume batches.

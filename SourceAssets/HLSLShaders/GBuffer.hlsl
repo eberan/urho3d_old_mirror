@@ -17,7 +17,9 @@ void VS(float4 iPos : POSITION,
         float4x3 iModelInstance : TEXCOORD2,
     #endif
     out float2 oTexCoord : TEXCOORD0,
-    out float oDepth : TEXCOORD1,
+    #ifndef HWDEPTH
+        out float oDepth : TEXCOORD1,
+    #endif
     #ifdef NORMALMAP
         out float3 oNormal : TEXCOORD2,
         out float3 oTangent : TEXCOORD3,
@@ -52,12 +54,16 @@ void VS(float4 iPos : POSITION,
     #endif
 
     oTexCoord = GetTexCoord(iTexCoord);
-    oDepth = GetDepth(oPos);
+    #ifndef HWDEPTH
+        oDepth = GetDepth(oPos);
+    #endif
 }
 
 void PS(
     float2 iTexCoord : TEXCOORD0,
+    #ifndef HWDEPTH
     float iDepth : TEXCOORD1,
+    #endif
     #ifdef NORMALMAP
         float3 iNormal : TEXCOORD2,
         float3 iTangent : TEXCOORD3,
@@ -65,19 +71,17 @@ void PS(
     #else
         float3 iNormal : TEXCOORD2,
     #endif
-    out float4 oDiff : COLOR0,
-    out float4 oNormal : COLOR1,
-    out float4 oDepth : COLOR2)
-{
-    #ifdef DIFFMAP
-        float4 diffInput = tex2D(sDiffMap, iTexCoord);
-        float3 diffColor = cMatDiffColor.rgb * diffInput.rgb;
-        #ifdef ALPHAMASK
-            if (diffInput.a < 0.5)
-                discard;
-        #endif
+    #ifndef HWDEPTH
+        out float4 oDepth : COLOR0,
+        out float4 oNormal : COLOR1)
     #else
-        float3 diffColor = cMatDiffColor.rgb;
+        out float4 oNormal : COLOR0)
+    #endif
+{
+    #ifdef ALPHAMASK
+        float4 diffInput = tex2D(sDiffMap, iTexCoord);
+        if (diffInput.a < 0.5)
+            discard;
     #endif
 
     #ifdef NORMALMAP
@@ -94,8 +98,8 @@ void PS(
     #endif
     float specPower = cMatSpecProperties.y / 255.0;
 
-    // Take fogging into account here so that deferred lights do not need to calculate it
-    oDiff = GetReverseFogFactor(iDepth) * float4(diffColor, specStrength);
     oNormal = float4(normal * 0.5 + 0.5, specPower);
-    oDepth = iDepth;
+    #ifndef HWDEPTH
+        oDepth = iDepth;
+    #endif
 }

@@ -50,21 +50,27 @@ void PS(
             float depth = Sample(sDepthBuffer, iScreenPos).r;
             float3 worldPos = lerp(iNearRay, iFarRay, depth);
         #else
-            float depth = Sample(sDepthBuffer, iScreenPos).r;
+            #ifdef HWDEPTH
+                float depth = ReconstructDepth(Sample(sDepthBuffer, iScreenPos).r);
+            #else
+                float depth = Sample(sDepthBuffer, iScreenPos).r;
+            #endif
             float3 worldPos = iFarRay * depth;
         #endif
         float4 normalInput = Sample(sNormalBuffer, iScreenPos);
-        float4 diffInput = Sample(sDiffBuffer, iScreenPos);
     #else
         #ifdef ORTHO
             float depth = tex2Dproj(sDepthBuffer, iScreenPos).r;
             float3 worldPos = lerp(iNearRay, iFarRay, depth) / iScreenPos.w;
         #else
-            float depth = tex2Dproj(sDepthBuffer, iScreenPos).r;
+            #ifdef HWDEPTH
+                float depth = ReconstructDepth(tex2Dproj(sDepthBuffer, iScreenPos).r);
+            #else
+                float depth = tex2Dproj(sDepthBuffer, iScreenPos).r;
+            #endif
             float3 worldPos = iFarRay * depth / iScreenPos.w;
         #endif
         float4 normalInput = tex2Dproj(sNormalBuffer, iScreenPos);
-        float4 diffInput = tex2Dproj(sDiffBuffer, iScreenPos);
     #endif
 
     // With specular, normalization greatly improves stability of reflections,
@@ -79,11 +85,12 @@ void PS(
     float3 lightDir;
     float diff;
 
+    // Accumulate light at half intensity to allow 2x "overburn"
     #ifdef DIRLIGHT
-        diff = GetDiffuseDir(normal, lightDir) * GetSplitFade(depth);
+        diff = 0.5 * GetDiffuseDir(normal, lightDir) * GetSplitFade(depth);
     #else
         float3 lightVec;
-        diff = GetDiffusePointOrSpot(normal, worldPos, lightDir, lightVec);
+        diff = 0.5 * GetDiffusePointOrSpot(normal, worldPos, lightDir, lightVec);
     #endif
 
     #ifdef SHADOW
@@ -103,11 +110,9 @@ void PS(
     #endif
 
     #ifdef SPECULAR
-        float spec = GetSpecular(normal, worldPos, lightDir, normalInput.a * 255.0);
-        float3 finalColor = diff * lightColor * (diffInput.rgb + spec * diffInput.a * cLightColor.a);
-        oColor = float4(finalColor, 0.0);
+        float spec = lightColor.g * GetSpecular(normal, worldPos, lightDir, normalInput.a * 255.0);
+        oColor = diff * float4(lightColor, spec * cLightColor.a);
     #else
-        float3 finalColor = diff * diffInput.rgb * lightColor;
-        oColor = float4(finalColor, 0.0);
+        oColor = diff * float4(lightColor, 0.0);
     #endif
 }
