@@ -70,7 +70,7 @@ Pass::Pass(PassType type) :
     alphaMask_(false),
     alphaTest_(false),
     blendMode_(BLEND_REPLACE),
-    depthTestMode_(CMP_LESS),
+    depthTestMode_(CMP_LESSEQUAL),
     depthWrite_(true)
 {
 }

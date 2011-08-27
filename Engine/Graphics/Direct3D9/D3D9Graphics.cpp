@@ -156,7 +156,6 @@ Graphics::Graphics(Context* context) :
     impl_(new GraphicsImpl()),
     width_(0),
     height_(0),
-    multiSample_(1),
     windowPosX_(0),
     windowPosY_(0),
     fullscreen_(false),
@@ -1839,27 +1838,6 @@ PODVector<IntVector2> Graphics::GetResolutions() const
     return ret;
 }
 
-PODVector<int> Graphics::GetMultiSampleLevels() const
-{
-    PODVector<int> ret;
-    // No multisampling always supported
-    ret.Push(1);
-    
-    if (!impl_->interface_)
-        return ret;
-    
-    D3DFORMAT fullscreenFormat = impl_->GetDesktopFormat();
-    
-    for (unsigned i = (int)D3DMULTISAMPLE_2_SAMPLES; i < (int)D3DMULTISAMPLE_16_SAMPLES; ++i)
-    {
-        if (SUCCEEDED(impl_->interface_->CheckDeviceMultiSampleType(impl_->adapter_, impl_->deviceType_, fullscreenFormat, FALSE,
-            (D3DMULTISAMPLE_TYPE)i, NULL)))
-            ret.Push(i);
-    }
-    
-    return ret;
-}
-
 VertexBuffer* Graphics::GetVertexBuffer(unsigned index) const
 {
     return index < MAX_VERTEX_STREAMS ? vertexBuffers_[index] : 0;
@@ -2191,18 +2169,6 @@ void Graphics::CreateRenderTargets()
             depthBuffer_->SetSize(0, 0, (D3DFORMAT)MAKEFOURCC('I', 'N', 'T', 'Z'), TEXTURE_DEPTHSTENCIL);
         }
     }
-    
-    // If deferred antialiasing is used, reserve screen buffer
-    // (later we will probably want the screen buffer reserved in any case, to do for example distortion effects,
-    // which will also be useful in forward rendering)
-    if (multiSample_ > 1)
-    {
-        screenBuffer_ = new Texture2D(context_);
-        screenBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
-        screenBuffer_->SetFilterMode(FILTER_BILINEAR);
-    }
-    else
-        screenBuffer_.Reset();
 }
 
 void Graphics::ResetDevice()

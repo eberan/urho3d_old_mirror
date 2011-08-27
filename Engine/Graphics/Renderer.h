@@ -296,9 +296,9 @@ private:
     Texture2D* GetShadowMap(float resolution);
     /// Get a shader program.
     ShaderVariation* GetShader(const String& name, const String& extension, bool checkExists) const;
-    /// Choose forward lighting shaders for a batch.
+    /// Choose shaders for a geometry batch.
     void SetBatchShaders(Batch& batch, Technique* technique, Pass* pass);
-    /// Choose shaders for a deferred light volume batch.
+    /// Choose shaders for a light volume batch.
     void SetLightVolumeShaders(Batch& batch);
     /// Reload shaders.
     void LoadShaders();

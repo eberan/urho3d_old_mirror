@@ -39,12 +39,8 @@ float4 PackNormalDepth(float3 normal, float depth)
 {
     float4 ret;
     ret.xy = normal.xz * 0.5 + 0.5;
-    ret.z = floor(depth * 127.0);
+    ret.z = (floor(depth * 127.0) + (normal.y < 0.0) * 128.0) * (1.0 / 255.0);
     ret.w = frac(depth * 127.0);
-    if (normal.y < 0.0)
-        ret.z += 128.0;
-    ret.z /= 255.0;
-
     return ret;
 }
 
@@ -60,7 +56,7 @@ void UnpackNormalDepth(float4 input, out float3 normal, out float depth)
         normal.y = -normal.y;
     }
 
-    depth = (hiDepth + input.w) / 127.0;
+    depth = (hiDepth + input.w) * (1.0 / 127.0);
 }
 
 float ReconstructDepth(float hwDepth)

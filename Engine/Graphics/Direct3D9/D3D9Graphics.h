@@ -217,8 +217,6 @@ public:
     int GetWidth() const { return width_; }
     /// Return window height.
     int GetHeight() const { return height_; }
-    /// Return multisample mode (1 = no multisampling.)
-    int GetMultiSample() const { return multiSample_; }
     /// Return whether window is fullscreen.
     bool GetFullscreen() const { return fullscreen_; }
     /// Return whether vertical sync is on.
@@ -257,29 +255,27 @@ public:
     bool GetStreamOffsetSupport() const { return streamOffsetSupport_; }
     /// Return supported fullscreen resolutions.
     PODVector<IntVector2> GetResolutions() const;
-    /// Return supported multisampling levels.
-    PODVector<int> GetMultiSampleLevels() const;
-    /// Return vertex buffer by index.
+    /// Return current vertex buffer by index.
     VertexBuffer* GetVertexBuffer(unsigned index) const;
-    /// Return index buffer.
+    /// Return current index buffer.
     IndexBuffer* GetIndexBuffer() const { return indexBuffer_; }
-    /// Return vertex declaration.
+    /// Return current vertex declaration.
     VertexDeclaration* GetVertexDeclaration() const { return vertexDeclaration_; }
-    /// Return vertex shader.
+    /// Return current vertex shader.
     ShaderVariation* GetVertexShader() const { return vertexShader_; }
-    /// Return pixel shader.
+    /// Return current pixel shader.
     ShaderVariation* GetPixelShader() const { return pixelShader_; }
     /// Return texture unit index by name.
     TextureUnit GetTextureUnit(const String& name);
-    /// Return texture by texture unit index.
+    /// Return current texture by texture unit index.
     Texture* GetTexture(unsigned index) const;
     /// Return deferred rendering destination render target.
     Texture* GetViewTexture() const { return viewTexture_; }
     /// Return default texture filtering mode.
     TextureFilterMode GetDefaultTextureFilterMode() const { return defaultTextureFilterMode_; }
-    /// Return render target by index.
+    /// Return current render target by index.
     RenderSurface* GetRenderTarget(unsigned index) const;
-    /// Return depth stencil buffer.
+    /// Return current depth stencil buffer.
     RenderSurface* GetDepthStencil() const { return depthStencil_; }
     /// Return the viewport coordinates.
     IntRect GetViewport() const { return viewport_; }
@@ -390,8 +386,6 @@ private:
     int width_;
     /// Window height.
     int height_;
-    /// Multisampling mode.
-    int multiSample_;
     /// Stored window X-position.
     int windowPosX_;
     /// Stored window Y-position.
