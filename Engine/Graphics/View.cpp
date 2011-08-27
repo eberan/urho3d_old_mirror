@@ -707,12 +707,15 @@ void View::RenderBatches()
         graphics_->SetRenderTarget(1, normalBuffer);
         #else
         // If using hardware depth, do not clear color at all. Else clear the depth rendertarget to far depth
-        if (graphics_->GetHardwareDepthSupport())
+        if (graphics_->GetHardwareDepthSupport() || renderer_->IsFallback())
         {
             graphics_->SetRenderTarget(0, normalBuffer);
             graphics_->SetDepthStencil(depthStencil_);
             graphics_->SetViewport(screenRect_);
-            graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL);
+            if (!renderer_->IsFallback())
+                graphics_->Clear(CLEAR_DEPTH | CLEAR_STENCIL);
+            else
+                graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color(0.5f, 0.5f, 1.0f, 1.0f));
         }
         else
         {

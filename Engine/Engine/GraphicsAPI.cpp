@@ -707,8 +707,10 @@ static void RegisterGraphics(asIScriptEngine* engine)
     engine->RegisterObjectMethod("Graphics", "bool get_deviceLost() const", asMETHOD(Graphics, IsDeviceLost), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "uint get_numPrimitives() const", asMETHOD(Graphics, GetNumPrimitives), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "uint get_numBatches() const", asMETHOD(Graphics, GetNumBatches), asCALL_THISCALL);
-    engine->RegisterObjectMethod("Graphics", "bool get_renderTargetSupport() const", asMETHOD(Graphics, GetRenderTargetSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_sm3Support() const", asMETHOD(Graphics, GetSM3Support), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Graphics", "bool get_gbufferSupport() const", asMETHOD(Graphics, GetGBufferSupport), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Graphics", "bool get_hardwareDepthSupport() const", asMETHOD(Graphics, GetHardwareShadowSupport), asCALL_THISCALL);
+    engine->RegisterObjectMethod("Graphics", "bool get_shadowSupport() const", asMETHOD(Graphics, GetShadowSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_hardwareShadowSupport() const", asMETHOD(Graphics, GetHardwareShadowSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "bool get_hiresShadowSupport() const", asMETHOD(Graphics, GetHiresShadowSupport), asCALL_THISCALL);
     engine->RegisterObjectMethod("Graphics", "Array<IntVector2>@ get_resolutions() const", asFUNCTION(GraphicsGetResolutions), asCALL_CDECL_OBJLAST);

@@ -96,14 +96,6 @@ enum DeferredLightPSVariation
     DLPS_POINTSPEC,
     DLPS_POINTMASK,
     DLPS_POINTMASKSPEC,
-    DLPS_HW,
-    DLPS_HWSPEC,
-    DLPS_HWSPOT,
-    DLPS_HWSPOTSPEC,
-    DLPS_HWPOINT,
-    DLPS_HWPOINTSPEC,
-    DLPS_HWPOINTMASK,
-    DLPS_HWPOINTMASKSPEC,
     DLPS_ORTHO,
     DLPS_ORTHOSPEC,
     DLPS_ORTHOSPOT,
@@ -112,6 +104,14 @@ enum DeferredLightPSVariation
     DLPS_ORTHOPOINTSPEC,
     DLPS_ORTHOPOINTMASK,
     DLPS_ORTHOPOINTMASKSPEC,
+    DLPS_HW,
+    DLPS_HWSPEC,
+    DLPS_HWSPOT,
+    DLPS_HWSPOTSPEC,
+    DLPS_HWPOINT,
+    DLPS_HWPOINTSPEC,
+    DLPS_HWPOINTMASK,
+    DLPS_HWPOINTMASKSPEC,
     DLPS_SHADOW,
     DLPS_SHADOWSPEC,
     DLPS_SPOTSHADOW,
@@ -120,14 +120,6 @@ enum DeferredLightPSVariation
     DLPS_POINTSHADOWSPEC,
     DLPS_POINTMASKSHADOW,
     DLPS_POINTMASKSHADOWSPEC,
-    DLPS_HWSHADOW,
-    DLPS_HWSHADOWSPEC,
-    DLPS_HWSPOTSHADOW,
-    DLPS_HWSPOTSHADOWSPEC,
-    DLPS_HWPOINTSHADOW,
-    DLPS_HWPOINTSHADOWSPEC,
-    DLPS_HWPOINTMASKSHADOW,
-    DLPS_HWPOINTMASKSHADOWSPEC,
     DLPS_ORTHOSHADOW,
     DLPS_ORTHOSHADOWSPEC,
     DLPS_ORTHOSPOTSHADOW,
@@ -136,6 +128,14 @@ enum DeferredLightPSVariation
     DLPS_ORTHOPOINTSHADOWSPEC,
     DLPS_ORTHOPOINTMASKSHADOW,
     DLPS_ORTHOPOINTMASKSHADOWSPEC,
+    DLPS_HWSHADOW,
+    DLPS_HWSHADOWSPEC,
+    DLPS_HWSPOTSHADOW,
+    DLPS_HWSPOTSHADOWSPEC,
+    DLPS_HWPOINTSHADOW,
+    DLPS_HWPOINTSHADOWSPEC,
+    DLPS_HWPOINTMASKSHADOW,
+    DLPS_HWPOINTMASKSHADOWSPEC,
     MAX_DEFERRED_LIGHT_PS_VARIATIONS
 };
 
@@ -213,6 +213,8 @@ public:
     unsigned GetNumViewports() const { return viewports_.Size(); }
     /// Return viewport.
     const Viewport& GetViewport(unsigned index) const;
+    /// Return whether is using the fallback lighting model.
+    bool IsFallback() const { return fallback_; }
     /// Return whether specular lighting is enabled.
     bool GetSpecularLighting() const { return specularLighting_; }
     /// Return whether drawing shadows is enabled.
@@ -395,6 +397,8 @@ private:
     unsigned numPrimitives_;
     /// Number of batches (3D geometry only.)
     unsigned numBatches_;
+    /// Fallback lighting model flag.
+    bool fallback_;
     /// Specular lighting flag.
     bool specularLighting_;
     /// Draw shadows flag.

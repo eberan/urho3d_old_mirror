@@ -205,7 +205,8 @@ public:
     void EndImmediate();
     /// %Set force Shader Model 2 flag. Needs to be set before setting initial screen mode to have effect.
     void SetForceSM2(bool enable);
-    
+    /// &Set force G-buffer fallback flag. Needs to be set before setting initial screen mode to have effect.
+    void SetForceGBufferFallback(bool enable);
     /// Return whether rendering initialized.
     bool IsInitialized() const;
     /// Return graphics implementation, which holds the actual API-specific resources.
@@ -240,12 +241,14 @@ public:
     unsigned GetShadowMapFormat() const { return shadowMapFormat_; }
     /// Return 24-bit shadow map depth texture format, or 0 if not supported.
     unsigned GetHiresShadowMapFormat() const { return hiresShadowMapFormat_; }
-    /// Return whether texture render targets are supported.
-    bool GetRenderTargetSupport() const { return renderTargetSupport_; }
     /// Return whether Shader Model 3 is supported.
     bool GetSM3Support() const { return hasSM3_; }
+    /// Return whether a full G-buffer is supported. If not, fallback lighting mode is needed.
+    bool GetGBufferSupport() const { return gbufferSupport_; }
     /// Return whether the hardware depth buffer can be sampled.
     bool GetHardwareDepthSupport() const { return hardwareDepthSupport_; }
+    /// Return whether shadows are supported.
+    bool GetShadowSupport() const { return shadowMapFormat_ != 0; }
     /// Return whether shadow map depth compare is done in hardware.
     bool GetHardwareShadowSupport() const { return hardwareShadowSupport_; }
     /// Return whether 24-bit shadow maps are supported.
@@ -405,8 +408,8 @@ private:
     bool queryIssued_;
     //! Use auto depth stencil flag
     bool systemDepthStencil_;
-    /// Texture render target support flag.
-    bool renderTargetSupport_;
+    /// G-buffer support flag.
+    bool gbufferSupport_;
     /// Hardware depth sampling support flag.
     bool hardwareDepthSupport_;
     /// Hardware shadow map depth compare support flag.
@@ -419,6 +422,8 @@ private:
     bool hasSM3_;
     /// Force Shader Model 2 flag.
     bool forceSM2_;
+    /// Force fallback G-buffer flag.
+    bool forceGBufferFallback_;
     /// Number of primitives this frame.
     unsigned numPrimitives_;
     /// Number of batches this frame.

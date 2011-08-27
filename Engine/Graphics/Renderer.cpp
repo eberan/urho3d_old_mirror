@@ -177,6 +177,12 @@ static const String hwVariations[] =
     "HW"
 };
 
+static const String fallbackVariations[] =
+{
+    "",
+    "FB"
+};
+
 static const String geometryVSVariations[] =
 {
     "",
@@ -211,14 +217,6 @@ static const String lightPSVariations[] =
     "PointSpec",
     "PointMask",
     "PointMaskSpec",
-    "HWDir",
-    "HWDirSpec",
-    "HWSpot",
-    "HWSpotSpec",
-    "HWPoint",
-    "HWPointSpec",
-    "HWPointMask",
-    "HWPointMaskSpec",
     "OrthoDir",
     "OrthoDirSpec",
     "OrthoSpot",
@@ -227,6 +225,14 @@ static const String lightPSVariations[] =
     "OrthoPointSpec",
     "OrthoPointMask",
     "OrthoPointMaskSpec",
+    "HWDir",
+    "HWDirSpec",
+    "HWSpot",
+    "HWSpotSpec",
+    "HWPoint",
+    "HWPointSpec",
+    "HWPointMask",
+    "HWPointMaskSpec",
     "DirShadow",
     "DirShadowSpec",
     "SpotShadow",
@@ -235,14 +241,6 @@ static const String lightPSVariations[] =
     "PointShadowSpec",
     "PointMaskShadow",
     "PointMaskShadowSpec",
-    "HWDirShadow",
-    "HWDirShadowSpec",
-    "HWSpotShadow",
-    "HWSpotShadowSpec",
-    "HWPointShadow",
-    "HWPointShadowSpec",
-    "HWPointMaskShadow",
-    "HWPointMaskShadowSpec",
     "OrthoDirShadow",
     "OrthoDirShadowSpec",
     "OrthoSpotShadow",
@@ -250,7 +248,15 @@ static const String lightPSVariations[] =
     "OrthoPointShadow",
     "OrthoPointShadowSpec",
     "OrthoPointMaskShadow",
-    "OrthoPointMaskShadowSpec"
+    "OrthoPointMaskShadowSpec",
+    "HWDirShadow",
+    "HWDirShadowSpec",
+    "HWSpotShadow",
+    "HWSpotShadowSpec",
+    "HWPointShadow",
+    "HWPointShadowSpec",
+    "HWPointMaskShadow",
+    "HWPointMaskShadowSpec"
 };
 
 static const unsigned INSTANCING_BUFFER_MASK = MASK_INSTANCEMATRIX1 | MASK_INSTANCEMATRIX2 | MASK_INSTANCEMATRIX3;
@@ -272,6 +278,7 @@ Renderer::Renderer(Context* context) :
     numShadowCameras_(0),
     numSplitLights_(0),
     numTempNodes_(0),
+    fallback_(false),
     specularLighting_(true),
     drawShadows_(true),
     textureAnisotropy_(4),
@@ -697,6 +704,8 @@ void Renderer::Initialize()
     }
     #endif
     
+    fallback_ = !graphics_->GetGBufferSupport();
+    
     defaultLightRamp_ = cache->GetResource<Texture2D>("Textures/Ramp.png");
     defaultLightSpot = cache->GetResource<Texture2D>("Textures/Spot.png");
     defaultMaterial_ = cache->GetResource<Material>("Materials/Default.xml");
@@ -722,12 +731,9 @@ void Renderer::ResetViews()
 
 bool Renderer::AddView(RenderSurface* renderTarget, const Viewport& viewport)
 {
-    // If using a render target texture, make sure it is supported, and will not be rendered to multiple times
+    // If using a render target texture, make sure it is not rendered to multiple times
     if (renderTarget)
     {
-        if (!graphics_->GetRenderTargetSupport())
-            return false;
-        
         for (unsigned i = 0; i < numViews_; ++i)
         {
             if (views_[i]->GetRenderTarget() == renderTarget)
@@ -873,7 +879,7 @@ void Renderer::SetBatchShaders(Batch& batch, Technique* technique, Pass* pass)
             unsigned psi = 0;
             vsi = batch.geometryType_ * MAX_LIGHT_VS_VARIATIONS;
             
-            if (specularLighting_ && light->GetSpecularIntensity() > 0.0f)
+            if (!fallback_ && specularLighting_ && light->GetSpecularIntensity() > 0.0f)
                 psi += LPS_SPEC;
             
             switch (light->GetLightType())
@@ -939,7 +945,7 @@ void Renderer::SetLightVolumeShaders(Batch& batch)
     if (light->GetShadowMap())
         psi += DLPS_SHADOW;
     
-    if (specularLighting_ && light->GetSpecularIntensity() > 0.0f)
+    if (!fallback_ && specularLighting_ && light->GetSpecularIntensity() > 0.0f)
         psi += DLPS_SPEC;
     
     if (batch.camera_->IsOrthographic())
@@ -967,24 +973,28 @@ void Renderer::LoadShaders()
     shadersChangedFrameNumber_ = GetSubsystem<Time>()->GetFrameNumber();
     
     // Load inbuilt shaders
+    unsigned fallback = fallback_ ? 1 : 0;
     stencilVS_ = GetVertexShader("Stencil");
     stencilPS_ = GetPixelShader("Stencil");
     lightVS_.Clear();
     lightPS_.Clear();
     lightVS_.Resize(MAX_DEFERRED_LIGHT_VS_VARIATIONS);
-    lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
+    if (!fallback)
+        lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
+    else
+        lightPS_.Resize(DLPS_HW); // In fallback mode there is no reconstructed depth and no shadows
     
     unsigned hwShadows = graphics_->GetHardwareShadowSupport() ? 1 : 0;
     
     for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_VS_VARIATIONS; ++i)
         lightVS_[i] = GetVertexShader("Light_" + deferredLightVSVariations[i]);
     
-    for (unsigned i = 0; i < MAX_DEFERRED_LIGHT_PS_VARIATIONS; ++i)
+    for (unsigned i = 0; i < lightPS_.Size(); ++i)
     {
         if (i >= DLPS_SHADOW)
             lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + hwVariations[hwShadows]);
         else
-            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i]);
+            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + fallbackVariations[fallback]);
     }
     
     // Remove shaders that are no longer referenced from the cache
@@ -1021,11 +1031,14 @@ void Renderer::LoadPassShaders(Technique* technique, PassType type)
         pixelShaderName += "_";
     
     // If INTZ depth is used, do not write depth into a rendertarget in the G-buffer pass
+    // Also check for fallback G-buffer (different layout)
     if (type == PASS_GBUFFER)
     {
         unsigned hwDepth = graphics_->GetHardwareDepthSupport() ? 1 : 0;
+        unsigned fallback = fallback_ ? 1 : 0;
         vertexShaderName += hwVariations[hwDepth];
         pixelShaderName += hwVariations[hwDepth];
+        pixelShaderName += fallbackVariations[fallback];
     }
     
     Vector<SharedPtr<ShaderVariation> >& vertexShaders = pass->GetVertexShaders();
@@ -1172,12 +1185,12 @@ bool Renderer::ResizeInstancingBuffer(unsigned numInstances)
 
 bool Renderer::CreateShadowMaps()
 {
+    if (!graphics_->GetShadowSupport())
+        return false;
+    
     unsigned shadowMapFormat = shadowMapHiresDepth_ ? graphics_->GetHiresShadowMapFormat() : graphics_->GetShadowMapFormat();
     unsigned dummyColorFormat = graphics_->GetDummyColorFormat();
     bool hardwarePCF = graphics_->GetHardwareShadowSupport();
-    
-    if (!shadowMapFormat)
-        return false;
     
     if (!drawShadows_)
     {

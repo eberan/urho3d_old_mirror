@@ -62,7 +62,7 @@ void VS(float4 iPos : POSITION,
 void PS(
     float2 iTexCoord : TEXCOORD0,
     #ifndef HWDEPTH
-    float iDepth : TEXCOORD1,
+        float iDepth : TEXCOORD1,
     #endif
     #ifdef NORMALMAP
         float3 iNormal : TEXCOORD2,
@@ -71,7 +71,7 @@ void PS(
     #else
         float3 iNormal : TEXCOORD2,
     #endif
-    #ifndef HWDEPTH
+    #if !defined(HWDEPTH) && !defined(FALLBACK)
         out float4 oDepth : COLOR0,
         out float4 oNormal : COLOR1)
     #else
@@ -91,15 +91,19 @@ void PS(
         float3 normal = normalize(iNormal);
     #endif
 
-    #ifdef SPECMAP
-        float specStrength = tex2D(sSpecMap, iTexCoord).r * cMatSpecProperties.x;
+    #ifdef FALLBACK
+        oNormal = PackNormalDepth(normal, iDepth);
     #else
-        float specStrength = cMatSpecProperties.x;
-    #endif
-    float specPower = cMatSpecProperties.y / 255.0;
+        #ifdef SPECMAP
+            float specStrength = tex2D(sSpecMap, iTexCoord).r * cMatSpecProperties.x;
+        #else
+            float specStrength = cMatSpecProperties.x;
+        #endif
+        float specPower = cMatSpecProperties.y / 255.0;
 
-    oNormal = float4(normal * 0.5 + 0.5, specPower);
-    #ifndef HWDEPTH
-        oDepth = iDepth;
+        oNormal = float4(normal * 0.5 + 0.5, specPower);
+        #ifndef HWDEPTH
+            oDepth = iDepth;
+        #endif
     #endif
 }

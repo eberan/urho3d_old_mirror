@@ -165,13 +165,14 @@ Graphics::Graphics(Context* context) :
     deviceLost_(false),
     queryIssued_(false),
     systemDepthStencil_(false),
-    renderTargetSupport_(true),
+    gbufferSupport_(false),
     hardwareDepthSupport_(false),
     hardwareShadowSupport_(false),
     hiresShadowSupport_(false),
     streamOffsetSupport_(false),
     hasSM3_(false),
     forceSM2_(false),
+    forceGBufferFallback_(false),
     numPrimitives_(0),
     numBatches_(0),
     immediateBuffer_(0),
@@ -1776,6 +1777,12 @@ void Graphics::SetForceSM2(bool enable)
     forceSM2_ = enable;
 }
 
+void Graphics::SetForceGBufferFallback(bool enable)
+{
+    // Note: this only has effect before calling SetMode() for the first time
+    forceGBufferFallback_ = enable;
+}
+
 bool Graphics::IsInitialized() const
 {
     return impl_->window_ != 0 && impl_->GetDevice() != 0;
@@ -2036,46 +2043,40 @@ bool Graphics::CreateInterface()
             hasSM3_ = true;
     }
     
-    // Check which kind of deferred rendering capability is available
-    if (impl_->CheckFormatSupport((D3DFORMAT)MAKEFOURCC('I', 'N', 'T', 'Z'), D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
+    // Check for G-buffer and hardware depth support
+    if (!forceGBufferFallback_)
     {
-        // Sampling INTZ buffer directly while also using it for depth test results in performance loss on ATI GPUs
-        // at least on Vista/Win7 (see http://aras-p.info/texts/D3D9GPUHacks.html). So, use INTZ buffer only with
-        // other vendors, or on Windows XP
-        unsigned windowsVersion = GetVersion() & 0xff;
-        if (impl_->adapterIdentifier_.VendorId != 0x1002 || windowsVersion < 6)
-            hardwareDepthSupport_ = true;
+        if (impl_->CheckFormatSupport((D3DFORMAT)MAKEFOURCC('I', 'N', 'T', 'Z'), D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
+        {
+            // Sampling INTZ buffer directly while also using it for depth test results in performance loss on ATI GPUs
+            // at least on Vista/Win7 (see http://aras-p.info/texts/D3D9GPUHacks.html). So, use INTZ buffer only with
+            // other vendors, or on Windows XP
+            unsigned windowsVersion = GetVersion() & 0xff;
+            if (impl_->adapterIdentifier_.VendorId != 0x1002 || windowsVersion < 6)
+            {
+                hardwareDepthSupport_ = true;
+                gbufferSupport_ = true;
+            }
+        }
+        if (!hardwareDepthSupport_)
+        {
+            if (impl_->CheckFormatSupport(D3DFMT_R32F, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE) &&
+                impl_->deviceCaps_.NumSimultaneousRTs >= 2)
+                gbufferSupport_ = true;
+        }
     }
     
-    if (impl_->CheckFormatSupport(D3DFMT_R32F, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
+    // Check shadow map support. Only check if the full lighting path will be used
+    if (gbufferSupport_)
     {
-    }
-    
-    if (impl_->deviceCaps_.NumSimultaneousRTs >= 3)
-    {
-    }
-    
-    // Prefer NVIDIA style hardware depth compared shadow maps if available
-    shadowMapFormat_ = D3DFMT_D16;
-    if (impl_->CheckFormatSupport((D3DFORMAT)shadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
-    {
-        hardwareShadowSupport_ = true;
-        
-        // Check for hires depth support
-        hiresShadowMapFormat_ = D3DFMT_D24X8;
-        if (impl_->CheckFormatSupport((D3DFORMAT)hiresShadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
-            hiresShadowSupport_ = true;
-        else
-            hiresShadowMapFormat_ = shadowMapFormat_;
-    }
-    else
-    {
-        // ATI DF16 format needs manual depth compare in the shader
-        shadowMapFormat_ = MAKEFOURCC('D', 'F', '1', '6');
+        // Prefer NVIDIA style hardware depth compared shadow maps if available
+        shadowMapFormat_ = D3DFMT_D16;
         if (impl_->CheckFormatSupport((D3DFORMAT)shadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
         {
+            hardwareShadowSupport_ = true;
+            
             // Check for hires depth support
-            hiresShadowMapFormat_ = MAKEFOURCC('D', 'F', '2', '4');
+            hiresShadowMapFormat_ = D3DFMT_D24X8;
             if (impl_->CheckFormatSupport((D3DFORMAT)hiresShadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
                 hiresShadowSupport_ = true;
             else
@@ -2083,31 +2084,45 @@ bool Graphics::CreateInterface()
         }
         else
         {
-            // No depth texture shadow map support -> no shadows at all
-            shadowMapFormat_ = 0;
-            hiresShadowMapFormat_ = 0;
+            // ATI DF16 format needs manual depth compare in the shader
+            shadowMapFormat_ = MAKEFOURCC('D', 'F', '1', '6');
+            if (impl_->CheckFormatSupport((D3DFORMAT)shadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
+            {
+                // Check for hires depth support
+                hiresShadowMapFormat_ = MAKEFOURCC('D', 'F', '2', '4');
+                if (impl_->CheckFormatSupport((D3DFORMAT)hiresShadowMapFormat_, D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
+                    hiresShadowSupport_ = true;
+                else
+                    hiresShadowMapFormat_ = shadowMapFormat_;
+            }
+            else
+            {
+                // No depth texture shadow map support -> no shadows at all
+                shadowMapFormat_ = 0;
+                hiresShadowMapFormat_ = 0;
+            }
         }
+        
+        // Check for Intel 4 Series with an old driver, enable manual shadow map compare in that case
+        if (shadowMapFormat_ == D3DFMT_D16)
+        {
+            if (impl_->adapterIdentifier_.VendorId == 0x8086 && impl_->adapterIdentifier_.DeviceId == 0x2a42 &&
+                impl_->adapterIdentifier_.DriverVersion.QuadPart <= 0x0007000f000a05d0ULL)
+                hardwareShadowSupport_ = false;
+        }
+        
+        // Check for shadow map color format; use null if available
+        dummyColorFormat_ = D3DFMT_A8R8G8B8;
+        D3DFORMAT nullFormat = (D3DFORMAT)MAKEFOURCC('N', 'U', 'L', 'L');
+        if (impl_->CheckFormatSupport(nullFormat, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
+            dummyColorFormat_ = nullFormat;
+        else if (impl_->CheckFormatSupport(D3DFMT_R16F, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
+            dummyColorFormat_ = D3DFMT_R16F;
+        else if (impl_->CheckFormatSupport(D3DFMT_R5G6B5, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
+            dummyColorFormat_ = D3DFMT_R5G6B5;
+        else if (impl_->CheckFormatSupport(D3DFMT_A4R4G4B4, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
+            dummyColorFormat_ = D3DFMT_A4R4G4B4;
     }
-    
-    // Check for Intel 4 Series with an old driver, enable manual shadow map compare in that case
-    if (shadowMapFormat_ == D3DFMT_D16)
-    {
-        if (impl_->adapterIdentifier_.VendorId == 0x8086 && impl_->adapterIdentifier_.DeviceId == 0x2a42 &&
-            impl_->adapterIdentifier_.DriverVersion.QuadPart <= 0x0007000f000a05d0ULL)
-            hardwareShadowSupport_ = false;
-    }
-    
-    // Check for shadow map color format; use null if available
-    dummyColorFormat_ = D3DFMT_A8R8G8B8;
-    D3DFORMAT nullFormat = (D3DFORMAT)MAKEFOURCC('N', 'U', 'L', 'L');
-    if (impl_->CheckFormatSupport(nullFormat, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
-        dummyColorFormat_ = nullFormat;
-    else if (impl_->CheckFormatSupport(D3DFMT_R16F, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
-        dummyColorFormat_ = D3DFMT_R16F;
-    else if (impl_->CheckFormatSupport(D3DFMT_R5G6B5, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
-        dummyColorFormat_ = D3DFMT_R5G6B5;
-    else if (impl_->CheckFormatSupport(D3DFMT_A4R4G4B4, D3DUSAGE_RENDERTARGET, D3DRTYPE_TEXTURE))
-        dummyColorFormat_ = D3DFMT_A4R4G4B4;
     
     // Stream offset enables writing one large instancing buffer
     if (impl_->deviceCaps_.DevCaps2 & D3DDEVCAPS2_STREAMOFFSET)
@@ -2163,7 +2178,7 @@ void Graphics::CreateRenderTargets()
         normalBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
     }
     
-    if (!depthBuffer_)
+    if (!depthBuffer_ && gbufferSupport_)
     {
         if (!hardwareDepthSupport_)
         {
