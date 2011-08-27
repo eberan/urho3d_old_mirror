@@ -47,6 +47,7 @@ class VertexBuffer;
 class VertexDeclaration;
 
 static const int IMMEDIATE_BUFFER_DEFAULT_SIZE = 1024;
+static const unsigned NUM_QUERIES = 2;
 
 /// %Shader parameter definition.
 struct ShaderParameter
@@ -398,8 +399,6 @@ private:
     bool flushGPU_;
     /// Direct3D device lost flag.
     bool deviceLost_;
-    /// Query issued (used to flush the GPU command queue) flag.
-    bool queryIssued_;
     //! Use auto depth stencil flag
     bool systemDepthStencil_;
     /// G-buffer support flag.
@@ -418,6 +417,10 @@ private:
     bool forceSM2_;
     /// Force fallback G-buffer flag.
     bool forceGBufferFallback_;
+    /// Query issued (used to flush the GPU command queue) flag.
+    bool queryIssued_[NUM_QUERIES];
+    /// Current query index
+    unsigned queryIndex_;
     /// Number of primitives this frame.
     unsigned numPrimitives_;
     /// Number of batches this frame.
