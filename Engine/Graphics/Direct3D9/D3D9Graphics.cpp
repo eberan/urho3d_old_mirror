@@ -504,17 +504,23 @@ bool Graphics::BeginFrame()
         }
     }
     
-    impl_->device_->BeginScene();
-    
-    // If a query was issued on the previous frame, wait for it to finish before beginning the next
-    if (impl_->frameQuery_ && queryIssued_)
+    // If a query was issued on the previous frame, wait for it to finish before beginning the next frame
+    if (impl_->frameQuery_)
     {
-        while (impl_->frameQuery_->GetData(0, 0, D3DGETDATA_FLUSH) == S_FALSE)
+        if (queryIssued_)
         {
+            while (impl_->frameQuery_->GetData(0, 0, D3DGETDATA_FLUSH) == S_FALSE);
+            queryIssued_ = false;
         }
-        
-        queryIssued_ = false;
+        // Immediately issue a new query if we want to keep flushing the GPU queue
+        if (flushGPU_)
+        {
+            impl_->frameQuery_->Issue(D3DISSUE_END);
+            queryIssued_ = true;
+        }
     }
+    
+    impl_->device_->BeginScene();
     
     // Set default rendertarget and depth buffer
     ResetRenderTargets();
@@ -548,17 +554,8 @@ void Graphics::EndFrame()
     
     SendEvent(E_ENDRENDERING);
     
-    // Optionally flush GPU buffer to avoid control lag or framerate fluctuations due to pre-render
-    if (impl_->frameQuery_ && flushGPU_)
-    {
-        impl_->frameQuery_->Issue(D3DISSUE_END);
-        queryIssued_ = true;
-    }
-    
-    {
-        impl_->device_->EndScene();
-        impl_->device_->Present(0, 0, 0, 0);
-    }
+    impl_->device_->EndScene();
+    impl_->device_->Present(0, 0, 0, 0);
 }
 
 void Graphics::Clear(unsigned flags, const Color& color, float depth, unsigned stencil)
