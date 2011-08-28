@@ -385,9 +385,9 @@ bool Texture2D::Create()
     if (!width_ || !height_)
         return false;
     
-    // If we create a depth stencil texture with packed format, create a renderbuffer instead of an actual texture
-    // This is because packed depth textures have performance problems with ATI GPUs
-    if (format_ == Graphics::GetDepthStencilFormat())
+    // If reading hardware depth is not supported, and we create a depth stencil texture with packed format,
+    // create a renderbuffer instead of an actual texture to avoid bugs and performance problems.
+    if (!graphics_->GetHardwareDepthSupport() && format_ == Graphics::GetDepthStencilFormat())
     {
         if (renderSurface_)
         {

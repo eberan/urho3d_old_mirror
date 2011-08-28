@@ -233,18 +233,16 @@ public:
     unsigned GetShadowMapFormat() const { return shadowMapFormat_; }
     /// Return 24-bit shadow map depth texture format, or 0 if not supported.
     unsigned GetHiresShadowMapFormat() const { return hiresShadowMapFormat_; }
-    /// Return whether deferred rendering is supported.
-    bool GetDeferredSupport() const { return deferredSupport_; }
     /// Return whether Shader Model 3 is supported. Always false on OpenGL.
     bool GetSM3Support() const { return false; }
     /// Return whether a full G-buffer is supported. Always true on OpenGL.
     bool GetGBufferSupport() const { return true; }
-    /// Return whether the hardware depth buffer can be sampled. Always false on OpenGL, as it is unreliable.
-    bool GetHardwareDepthSupport() const { return false; }
+    /// Return whether the hardware depth buffer can be sampled (without bugs or undue performance loss.)
+    bool GetHardwareDepthSupport() const { return hardwareDepthSupport_; }
     /// Return whether shadows are supported.
     bool GetShadowSupport() const { return shadowMapFormat_ != 0; }
-    /// Return whether shadow map depth compare is done in hardware. Always true on OpenGL.
-    bool GetHardwareShadowSupport() const { return true; }
+    /// Return whether shadow map depth compare is done in hardware. Always true on OpenGL, but return false to avoid the HW suffix in shaders.
+    bool GetHardwareShadowSupport() const { return false; }
     /// Return whether 24-bit shadow maps are supported. Assume true on OpenGL.
     bool GetHiresShadowSupport() const { return true; }
     /// Return whether stream offset is supported. Always false on OpenGL.
@@ -347,8 +345,6 @@ public:
     static unsigned GetRGBFormat();
     /// Return the API-specific RGBA texture format.
     static unsigned GetRGBAFormat();
-    /// Return the API-specific deferred rendering depth texture format.
-    static unsigned GetDepthFormat();
     /// Return the API-specific depth stencil texture format.
     static unsigned GetDepthStencilFormat();
     
@@ -378,14 +374,12 @@ private:
     bool fullscreen_;
     /// Vertical sync flag.
     bool vsync_;
-	/// Triple buffering flag.
-	bool tripleBuffer_;
+    /// Triple buffering flag.
+    bool tripleBuffer_;
     /// Flush GPU command queue flag.
     bool flushGPU_;
-    /// Texture render target support flag.
-    bool renderTargetSupport_;
-    /// Deferred rendering support flag.
-    bool deferredSupport_;
+    /// Hardware depth support flag.
+    bool hardwareDepthSupport_;
     /// Number of primitives this frame.
     unsigned numPrimitives_;
     /// Number of batches this frame.

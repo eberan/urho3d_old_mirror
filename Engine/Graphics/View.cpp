@@ -643,7 +643,7 @@ void View::RenderBatches()
     bool edgeFilter = false;
     #ifdef USE_OPENGL
     RenderSurface* renderBuffer = graphics_->GetScreenBuffer()->GetRenderSurface();
-    RenderSurface* depthStencil = 0;
+    RenderSurface* depthStencil = graphics_->GetHardwareDepthSupport() ? depthBuffer->GetRenderSurface() : 0;
     #else
     RenderSurface* renderBuffer = renderTarget_;
     RenderSurface* depthStencil = 0;

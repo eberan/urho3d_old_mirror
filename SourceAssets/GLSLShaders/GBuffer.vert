@@ -2,7 +2,9 @@
 #include "../Transform.vert"
 
 varying vec2 vTexCoord;
+#ifndef HWDEPTH
 varying float vDepth;
+#endif
 varying vec3 vNormal;
 #ifdef NORMALMAP
 varying vec3 vTangent;
@@ -30,5 +32,7 @@ void main()
     #endif
 
     vTexCoord = GetTexCoord(iTexCoord);
-    vDepth = GetDepth(gl_Position);
+    #ifndef HWDEPTH
+        vDepth = GetDepth(gl_Position);
+    #endif
 }

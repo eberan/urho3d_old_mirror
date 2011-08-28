@@ -18,7 +18,7 @@ void VS(float4 iPos : POSITION,
     #endif
     out float2 oTexCoord : TEXCOORD0,
     #ifndef HWDEPTH
-        out float4 oDepth : TEXCOORD1,
+        out float oDepth : TEXCOORD1,
     #endif
     #ifdef NORMALMAP
         out float3 oNormal : TEXCOORD2,
@@ -55,14 +55,14 @@ void VS(float4 iPos : POSITION,
 
     oTexCoord = GetTexCoord(iTexCoord);
     #ifndef HWDEPTH
-        oDepth = float4(GetDepth(oPos), 0, oPos.z, oPos.w);
+        oDepth = GetDepth(oPos);
     #endif
 }
 
 void PS(
     float2 iTexCoord : TEXCOORD0,
     #ifndef HWDEPTH
-        float4 iDepth : TEXCOORD1,
+        float iDepth : TEXCOORD1,
     #endif
     #ifdef NORMALMAP
         float3 iNormal : TEXCOORD2,
@@ -104,8 +104,7 @@ void PS(
 
         oNormal = float4(normal * 0.5 + 0.5, specPower);
         #ifndef HWDEPTH
-            // Non-fallback mode uses always non-linear depth so that light shaders can be kept the same
-            oDepth = iDepth.z / iDepth.w;
+            oDepth = iDepth;
         #endif
     #endif
 }

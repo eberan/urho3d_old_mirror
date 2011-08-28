@@ -174,12 +174,13 @@ static const unsigned short spotLightIndexData[] =
 static const String hwVariations[] =
 {
     "",
-    // On OpenGL, there is no separate hardware depth path, as it is always supported
-    #ifdef USE_OPENGL
-    ""
-    #else
     "HW"
-    #endif
+};
+
+static const String linearVariations[] =
+{
+    "",
+    "Linear"
 };
 
 static const String fallbackVariations[] =
@@ -982,10 +983,11 @@ void Renderer::LoadShaders()
     
     for (unsigned i = 0; i < lightPS_.Size(); ++i)
     {
+        String linearDepth = linearVariations[!graphics_->GetHardwareDepthSupport() && (i % DLPS_SHADOW) < DLPS_ORTHO ? 1 : 0];
         if (i >= DLPS_SHADOW)
-            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + hwVariations[hwShadows]);
+            lightPS_[i] = GetPixelShader("Light_" + linearDepth + lightPSVariations[i] + hwVariations[hwShadows]);
         else
-            lightPS_[i] = GetPixelShader("Light_" + lightPSVariations[i] + fallbackVariations[fallback]);
+            lightPS_[i] = GetPixelShader("Light_" + linearDepth + lightPSVariations[i] + fallbackVariations[fallback]);
     }
     
     // Remove shaders that are no longer referenced from the cache

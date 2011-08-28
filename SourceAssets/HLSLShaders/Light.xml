@@ -4,7 +4,8 @@
         <option name="Dir" define="DIRLIGHT" />
     </shader>
     <shader name="Light" type="ps">
-        <option name="Ortho" define="ORTHO" />
+        <option name="Linear" define="LINEAR" exclude="Ortho" />
+        <option name="Ortho" define="ORTHO" exclude="Linear" />
         <variation name="Dir">
             <define name="DIRLIGHT" />
             <define name="LIGHT" />
@@ -22,8 +23,10 @@
         <option name="Spec" define="SPECULAR" />
         <option name="HW" define="HWSHADOW" require="SHADOW" />
         <option name="FB" define="FALLBACK">
+            <exclude name="Linear" />
             <exclude name="Shadow" />
             <exclude name="Spec" />
+            <exclude name="HW" />
         </option>
     </shader>
 </shaders>

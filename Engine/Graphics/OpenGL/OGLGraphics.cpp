@@ -125,9 +125,9 @@ Graphics::Graphics(Context* context_) :
     height_(0),
     fullscreen_(false),
     vsync_(false),
+    tripleBuffer_(false),
     flushGPU_(true),
-    renderTargetSupport_(false),
-    deferredSupport_(false),
+    hardwareDepthSupport_(false),
     numPrimitives_(0),
     numBatches_(0),
     immediateVertexCount_(0),
@@ -250,6 +250,11 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync, bool 
         
         // Associate GLFW window with the execution context
         SetWindowContext(impl_->window_, context_);
+        
+        // Check vendor. For now, only enable hardware depth buffer on NVIDIA GPUs
+        String vendor((const char*)glGetString(GL_VENDOR));
+        if (vendor.ToLower().Find("nvidia") != String::NPOS)
+            hardwareDepthSupport_ = true;
     }
     
     // Set vsync
@@ -1945,11 +1950,6 @@ unsigned Graphics::GetRGBAFormat()
     return GL_RGBA;
 }
 
-unsigned Graphics::GetDepthFormat()
-{
-    return GL_RGBA;
-}
-
 unsigned Graphics::GetDepthStencilFormat()
 {
     return GL_DEPTH24_STENCIL8_EXT;
@@ -1972,7 +1972,7 @@ void Graphics::CreateRenderTargets()
     if (!depthBuffer_)
     {
         depthBuffer_ = new Texture2D(context_);
-        depthBuffer_->SetSize(0, 0, GetDepthFormat(), TEXTURE_RENDERTARGET);
+        depthBuffer_->SetSize(0, 0, hardwareDepthSupport_ ? GetDepthStencilFormat() : GetRGBAFormat(), TEXTURE_RENDERTARGET);
     }
     
     if (!screenBuffer_)

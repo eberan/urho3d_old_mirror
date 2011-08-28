@@ -16,18 +16,28 @@ void main()
 {
     // If rendering a directional light quad, optimize out the w divide
     #ifdef DIRLIGHT
-        float depth = UnpackDepth(texture2D(sDepthBuffer, vScreenPos).rgb);
         #ifdef ORTHO
+            float depth = UnpackDepth(texture2D(sDepthBuffer, vScreenPos).rgb);
             vec3 worldPos = mix(vNearRay, vFarRay, depth);
         #else
+            #ifdef LINEAR
+                float depth = UnpackDepth(texture2D(sDepthBuffer, vScreenPos).rgb);
+            #else
+                float depth = ReconstructDepth(texture2D(sDepthBuffer, vScreenPos).r);
+            #endif
             vec3 worldPos = vFarRay * depth;
         #endif
         vec4 normalInput = texture2D(sNormalBuffer, vScreenPos);
     #else
-        float depth = UnpackDepth(texture2DProj(sDepthBuffer, vScreenPos).rgb);
         #ifdef ORTHO
+            float depth = UnpackDepth(texture2DProj(sDepthBuffer, vScreenPos).rgb);
             vec3 worldPos = mix(vNearRay, vFarRay, depth) / vScreenPos.w;
         #else
+            #ifdef LINEAR
+                float depth = UnpackDepth(texture2DProj(sDepthBuffer, vScreenPos).rgb);
+            #else
+                float depth = ReconstructDepth(texture2DProj(sDepthBuffer, vScreenPos).r);
+            #endif
             vec3 worldPos = vFarRay * depth / vScreenPos.w;
         #endif
         vec4 normalInput = texture2DProj(sNormalBuffer, vScreenPos);

@@ -3,7 +3,9 @@
 #include "Fog.frag"
 
 varying vec2 vTexCoord;
+#ifndef HWDEPTH
 varying float vDepth;
+#endif
 varying vec3 vNormal;
 #ifdef NORMALMAP
 varying vec3 vTangent;
@@ -32,6 +34,10 @@ void main()
     #endif
     float specPower = cMatSpecProperties.y / 255.0;
 
-    gl_FragData[0] = vec4(PackDepth(vDepth), 0.0);
-    gl_FragData[1] = vec4(normal * 0.5 + 0.5, specPower);
+    #ifndef HWDEPTH
+        gl_FragData[0] = vec4(PackDepth(vDepth), 0.0);
+        gl_FragData[1] = vec4(normal * 0.5 + 0.5, specPower);
+    #else
+        gl_FragColor = vec4(normal * 0.5 + 0.5, specPower);
+    #endif
 }
