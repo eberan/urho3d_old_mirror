@@ -23,6 +23,24 @@ vec3 UnpackNormal(vec4 normalInput)
     return normal;
 }
 
+vec3 PackDepth(float depth)
+{
+    vec3 ret;
+    depth *= 255;
+    ret.x = floor(depth);
+    depth = (depth - ret.x) * 255;
+    ret.y = floor(depth);
+    ret.z = (depth - ret.y);
+    ret.xy *= 1.0 / 255;
+    return ret;
+}
+
+float UnpackDepth(vec3 depth)
+{
+    const vec3 dotValues = vec3(1.0, 1.0 / 255, 1.0 / (255 * 255));
+    return dot(depth, dotValues);
+}
+
 float ReconstructDepth(float hwDepth)
 {
     return cDepthReconstruct.y / (hwDepth - cDepthReconstruct.x);

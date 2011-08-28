@@ -239,8 +239,8 @@ public:
     bool GetSM3Support() const { return false; }
     /// Return whether a full G-buffer is supported. Always true on OpenGL.
     bool GetGBufferSupport() const { return true; }
-    /// Return whether the hardware depth buffer can be sampled. Always true on OpenGL.
-    bool GetHardwareDepthSupport() const { return true; }
+    /// Return whether the hardware depth buffer can be sampled. Always false on OpenGL, as it is unreliable.
+    bool GetHardwareDepthSupport() const { return false; }
     /// Return whether shadows are supported.
     bool GetShadowSupport() const { return shadowMapFormat_ != 0; }
     /// Return whether shadow map depth compare is done in hardware. Always true on OpenGL.
@@ -329,6 +329,8 @@ public:
     Texture2D* GetNormalBuffer() const { return normalBuffer_; }
     /// Return depth buffer for deferred rendering. If reading hardware depth is supported, return a depth texture.
     Texture2D* GetDepthBuffer() const { return depthBuffer_; }
+    /// Return screen buffer for post-processing.
+    Texture2D* GetScreenBuffer() const { return screenBuffer_; }
     
     /// Add a GPU object to keep track of. Called by GPUObject.
     void AddGPUObject(GPUObject* object);
@@ -412,6 +414,8 @@ private:
     SharedPtr<Texture2D> normalBuffer_;
     /// Deferred rendering depth buffer.
     SharedPtr<Texture2D> depthBuffer_;
+    /// Screen buffer for post processing.
+    SharedPtr<Texture2D> screenBuffer_;
     /// Shadow map depth texture format.
     unsigned shadowMapFormat_;
     /// Shadow map 24-bit depth texture format.

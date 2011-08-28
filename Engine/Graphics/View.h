@@ -119,8 +119,6 @@ public:
     Zone* GetZone() const { return zone_; }
     /// Return the render target. 0 if using the backbuffer.
     RenderSurface* GetRenderTarget() const { return renderTarget_; }
-    /// Return the depth stencil. 0 if using the backbuffer's depth stencil.
-    RenderSurface* GetDepthStencil() const { return depthStencil_; }
     /// Return geometry objects.
     const PODVector<Drawable*>& GetGeometries() const { return geometries_; }
     /// Return occluder objects.
@@ -194,8 +192,6 @@ private:
     Zone* zone_;
     /// Color buffer to use.
     RenderSurface* renderTarget_;
-    /// Depth buffer to use.
-    RenderSurface* depthStencil_;
     /// Screen rectangle.
     IntRect screenRect_;
     /// Render target width.

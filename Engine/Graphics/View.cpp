@@ -65,8 +65,7 @@ View::View(Context* context) :
     octree_(0),
     camera_(0),
     zone_(0),
-    renderTarget_(0),
-    depthStencil_(0)
+    renderTarget_(0)
 {
     frame_.camera_ = 0;
 }
@@ -106,19 +105,6 @@ bool View::Define(RenderSurface* renderTarget, const Viewport& viewport)
     octree_ = octree;
     camera_ = viewport.camera_;
     renderTarget_ = renderTarget;
-    
-    if (!renderTarget)
-        depthStencil_ = 0;
-    else
-    {
-        // In Direct3D9 deferred rendering, always use the system depth stencil for the whole time
-        // to ensure it is as large as the G-buffer
-        #ifdef USE_OPENGL
-        depthStencil_ = renderTarget->GetLinkedDepthBuffer();
-        #else
-        depthStencil_ = 0;
-        #endif
-    }
     
     zone_ = renderer_->GetDefaultZone();
     
@@ -655,8 +641,13 @@ void View::RenderBatches()
     
     /// \todo Reimplement deferred antialiasing
     bool edgeFilter = false;
+    #ifdef USE_OPENGL
+    RenderSurface* renderBuffer = graphics_->GetScreenBuffer()->GetRenderSurface();
+    RenderSurface* depthStencil = 0;
+    #else
     RenderSurface* renderBuffer = renderTarget_;
-    RenderSurface* gBufferDepthStencil = graphics_->GetHardwareDepthSupport() ? depthBuffer->GetRenderSurface() : depthStencil_;
+    RenderSurface* depthStencil = 0;
+    #endif
     
     // Calculate shader parameters needed only in deferred rendering
     Vector3 nearVector, farVector;
@@ -702,7 +693,7 @@ void View::RenderBatches()
         if (graphics_->GetHardwareDepthSupport() || renderer_->IsFallback())
         {
             graphics_->SetRenderTarget(0, normalBuffer);
-            graphics_->SetDepthStencil(gBufferDepthStencil);
+            graphics_->SetDepthStencil(depthStencil);
             graphics_->SetViewport(screenRect_);
             if (renderer_->IsFallback())
                 graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color(0.5f, 0.5f, 1.0f, 1.0f));
@@ -712,7 +703,7 @@ void View::RenderBatches()
         else
         {
             graphics_->SetRenderTarget(0, depthBuffer);
-            graphics_->SetDepthStencil(depthStencil_);
+            graphics_->SetDepthStencil(depthStencil);
             graphics_->SetViewport(screenRect_);
             graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH | CLEAR_STENCIL, Color::WHITE);
             graphics_->SetRenderTarget(1, normalBuffer);
@@ -730,7 +721,7 @@ void View::RenderBatches()
         
         graphics_->SetRenderTarget(0, lightBuffer);
         graphics_->ResetRenderTarget(1);
-        graphics_->SetDepthStencil(gBufferDepthStencil);
+        graphics_->SetDepthStencil(depthStencil);
         graphics_->SetViewport(screenRect_);
         graphics_->Clear(CLEAR_COLOR, ambient);
         
@@ -747,7 +738,7 @@ void View::RenderBatches()
             if (queue.volumeBatches_.Size())
             {
                 graphics_->SetRenderTarget(0, lightBuffer);
-                graphics_->SetDepthStencil(gBufferDepthStencil);
+                graphics_->SetDepthStencil(depthStencil);
                 graphics_->SetViewport(screenRect_);
                 graphics_->SetTexture(TU_SHADOWMAP, queue.light_->GetShadowMap());
                 graphics_->SetTexture(TU_NORMALBUFFER, normalBuffer);
@@ -765,7 +756,7 @@ void View::RenderBatches()
         if (noShadowLightQueue_.sortedBatches_.Size())
         {
             graphics_->SetRenderTarget(0, lightBuffer);
-            graphics_->SetDepthStencil(gBufferDepthStencil);
+            graphics_->SetDepthStencil(depthStencil);
             graphics_->SetViewport(screenRect_);
             graphics_->SetTexture(TU_NORMALBUFFER, normalBuffer);
             graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
@@ -783,22 +774,11 @@ void View::RenderBatches()
         // Render deferred and forward base passes
         PROFILE(RenderBasePass);
         
-        // In OpenGL mode, copy depth at this point to the destination depth buffer
         graphics_->SetStencilTest(false);
         graphics_->SetRenderTarget(0, renderBuffer);
-        graphics_->SetDepthStencil(depthStencil_);
+        graphics_->SetDepthStencil(depthStencil);
         graphics_->SetViewport(screenRect_);
-        #ifdef USE_OPENGL
-        graphics_->SetBlendMode(BLEND_REPLACE);
-        graphics_->SetDepthTest(CMP_ALWAYS);
-        graphics_->SetDepthWrite(true);
-        graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
-        graphics_->SetShaders(renderer_->GetVertexShader("Ambient"), renderer_->GetPixelShader("Ambient"));
-        DrawFullscreenQuad(*camera_, false);
-        //graphics_->Clear(CLEAR_COLOR | CLEAR_DEPTH, zone_->GetFogColor());
-        #else
         graphics_->Clear(CLEAR_COLOR, zone_->GetFogColor());
-        #endif
         
         graphics_->SetTexture(TU_NORMALBUFFER, 0);
         graphics_->SetTexture(TU_DEPTHBUFFER, 0);
@@ -822,6 +802,23 @@ void View::RenderBatches()
         
         RenderBatchQueue(transparentQueue_, true);
     }
+    
+    #ifdef USE_OPENGL
+    // In OpenGL mode, copy the screen to backbuffer now
+    graphics_->SetAlphaTest(false);
+    graphics_->SetBlendMode(BLEND_REPLACE);
+    graphics_->SetDepthTest(CMP_ALWAYS);
+    graphics_->SetDepthWrite(true);
+    graphics_->SetScissorTest(false);
+    graphics_->SetStencilTest(false);
+    graphics_->SetRenderTarget(0, renderTarget_);
+    graphics_->SetDepthStencil(renderTarget_ ? renderTarget_->GetLinkedDepthBuffer() : 0);
+    graphics_->SetViewport(screenRect_);
+    graphics_->SetTexture(TU_DIFFUSE, graphics_->GetScreenBuffer());
+    graphics_->SetTexture(TU_DEPTHBUFFER, depthBuffer);
+    graphics_->SetShaders(renderer_->GetVertexShader("CopyScreen"), renderer_->GetPixelShader("CopyScreen"));
+    DrawFullscreenQuad(*camera_, false);
+    #endif
 }
 
 void View::UpdateOccluders(PODVector<Drawable*>& occluders, Camera* camera)

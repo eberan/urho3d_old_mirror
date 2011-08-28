@@ -1,0 +1,4 @@
+<shaders>
+    <shader name="CopyScreen" type="vs" />
+    <shader name="CopyScreen" type="ps" />
+</shaders>
