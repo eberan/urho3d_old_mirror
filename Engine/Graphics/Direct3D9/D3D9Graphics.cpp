@@ -2029,10 +2029,8 @@ bool Graphics::CreateInterface()
         if (impl_->CheckFormatSupport((D3DFORMAT)MAKEFOURCC('I', 'N', 'T', 'Z'), D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE))
         {
             // Sampling INTZ buffer directly while also using it for depth test results in performance loss on ATI GPUs
-            // at least on Vista/Win7 (see http://aras-p.info/texts/D3D9GPUHacks.html). So, use INTZ buffer only with
-            // other vendors, or on Windows XP
-            unsigned windowsVersion = GetVersion() & 0xff;
-            if (impl_->adapterIdentifier_.VendorId != 0x1002 || windowsVersion < 6)
+            // So, use INTZ buffer only with other vendors
+            if (impl_->adapterIdentifier_.VendorId != 0x1002)
             {
                 hardwareDepthSupport_ = true;
                 gbufferSupport_ = true;

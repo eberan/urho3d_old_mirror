@@ -456,7 +456,7 @@ void View::GetBatches()
             // Prepare lit object + shadow caster queues for each split
             if (lightQueues_.Size() < lightQueueCount + splits)
                 lightQueues_.Resize(lightQueueCount + splits);
-            unsigned prevLightQueueCount = lightQueueCount;
+            bool firstSplitStored = false;
             
             for (unsigned j = 0; j < splits; ++j)
             {
@@ -466,7 +466,7 @@ void View::GetBatches()
                 lightQueue.shadowBatches_.Clear();
                 lightQueue.litBatches_.Clear();
                 lightQueue.volumeBatches_.Clear();
-                lightQueue.lastSplit_ = false;
+                lightQueue.firstSplit_ = !firstSplitStored;
                 
                 // Loop through shadow casters
                 Camera* shadowCamera = splitLight->GetShadowCamera();
@@ -542,14 +542,11 @@ void View::GetBatches()
                     if (storeLightQueue)
                     {
                         lightQueueIndex[splitLight] = lightQueueCount;
+                        firstSplitStored = true;
                         ++lightQueueCount;
                     }
                 }
             }
-            
-            // Mark the last split
-            if (lightQueueCount != prevLightQueueCount)
-                lightQueues_[lightQueueCount - 1].lastSplit_ = true;
         }
         
         // Resize the light queue vector now that final size is known
@@ -758,16 +755,8 @@ void View::RenderBatches()
                 
                 for (unsigned j = 0; j < queue.volumeBatches_.Size(); ++j)
                 {
-                    SetupLightBatch(queue.volumeBatches_[j]);
+                    SetupLightBatch(queue.volumeBatches_[j], queue.firstSplit_);
                     queue.volumeBatches_[j].Draw(graphics_, shaderParameters_);
-                }
-                
-                // If was the last split of a split point light, clear the stencil with a scissored clear
-                if (queue.lastSplit_ && queue.light_->GetLightType() == LIGHT_SPLITPOINT)
-                {
-                    OptimizeLightByScissor(queue.light_->GetOriginalLight());
-                    graphics_->Clear(CLEAR_STENCIL);
-                    graphics_->SetScissorTest(false);
                 }
             }
         }
@@ -784,7 +773,7 @@ void View::RenderBatches()
             
             for (unsigned i = 0; i < noShadowLightQueue_.sortedBatches_.Size(); ++i)
             {
-                SetupLightBatch(*noShadowLightQueue_.sortedBatches_[i]);
+                SetupLightBatch(*noShadowLightQueue_.sortedBatches_[i], false);
                 noShadowLightQueue_.sortedBatches_[i]->Draw(graphics_, shaderParameters_);
             }
         }
@@ -1789,7 +1778,7 @@ void View::CalculateShaderParameters()
 }
 
 
-void View::SetupLightBatch(Batch& batch)
+void View::SetupLightBatch(Batch& batch, bool firstSplit)
 {
     Matrix3x4 view(batch.camera_->GetInverseWorldTransform());
     
@@ -1821,7 +1810,7 @@ void View::SetupLightBatch(Batch& batch)
             graphics_->SetColorWrite(false);
             graphics_->SetCullMode(CULL_NONE);
             graphics_->SetDepthTest(CMP_LESSEQUAL);
-            graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
+            graphics_->SetStencilTest(true, CMP_ALWAYS, OP_REF, OP_ZERO, OP_ZERO, 1);
             graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
             graphics_->SetShaderParameter(VSP_VIEWPROJ, projection);
             graphics_->SetShaderParameter(VSP_MODEL, nearTransform);
@@ -1833,7 +1822,7 @@ void View::SetupLightBatch(Batch& batch)
             // Re-enable color write, set test for rendering the actual light
             graphics_->SetColorWrite(true);
             graphics_->SetDepthTest(CMP_GREATER);
-            graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
+            graphics_->SetStencilTest(true, CMP_EQUAL, OP_KEEP, OP_KEEP, OP_KEEP, 1);
         }
     }
     else
@@ -1844,6 +1833,14 @@ void View::SetupLightBatch(Batch& batch)
         if (light->GetLightType() == LIGHT_SPLITPOINT)
         {
             // Shadowed point light, split in 6 frustums: mask out overlapping pixels to prevent overlighting
+            // If it is the first split, zero the stencil with a scissored clear operation
+            if (firstSplit)
+            {
+                OptimizeLightByScissor(light->GetOriginalLight());
+                graphics_->Clear(CLEAR_STENCIL);
+                graphics_->SetScissorTest(false);
+            }
+            
             // Check whether we should draw front or back faces
             bool drawBackFaces = lightViewDist < (lightExtent + batch.camera_->GetNearClip());
             graphics_->SetColorWrite(false);
@@ -1881,7 +1878,7 @@ void View::SetupLightBatch(Batch& batch)
                     graphics_->SetColorWrite(false);
                     graphics_->SetCullMode(CULL_CW);
                     graphics_->SetDepthTest(CMP_GREATER);
-                    graphics_->SetStencilTest(true, CMP_ALWAYS, OP_INCR, OP_KEEP, OP_KEEP, 1);
+                    graphics_->SetStencilTest(true, CMP_ALWAYS, OP_REF, OP_ZERO, OP_ZERO, 1);
                     graphics_->SetShaders(renderer_->stencilVS_, renderer_->stencilPS_);
                     graphics_->SetShaderParameter(VSP_VIEWPROJ, projection * view);
                     graphics_->SetShaderParameter(VSP_MODEL, model);
@@ -1891,7 +1888,7 @@ void View::SetupLightBatch(Batch& batch)
                     
                     // Re-enable color write, set test for rendering the actual light
                     graphics_->SetColorWrite(true);
-                    graphics_->SetStencilTest(true, CMP_EQUAL, OP_ZERO, OP_KEEP, OP_ZERO, 1);
+                    graphics_->SetStencilTest(true, CMP_EQUAL, OP_KEEP, OP_KEEP, OP_KEEP, 1);
                     graphics_->SetCullMode(CULL_CCW);
                     graphics_->SetDepthTest(CMP_LESS);
                 }

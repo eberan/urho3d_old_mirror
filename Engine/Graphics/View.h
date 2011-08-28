@@ -174,7 +174,7 @@ private:
     /// Calculate view-global shader parameters.
     void CalculateShaderParameters();
     /// %Set up a light volume rendering batch.
-    void SetupLightBatch(Batch& batch);
+    void SetupLightBatch(Batch& batch, bool firstSplit);
     /// Draw a full screen quad (either near or far.) Shaders must have been set beforehand.
     void DrawFullscreenQuad(Camera& camera, bool nearQuad);
     /// Draw everything in a batch queue, priority batches first.
