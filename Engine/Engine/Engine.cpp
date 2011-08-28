@@ -77,6 +77,7 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
     int mixRate = 44100;
     bool fullscreen = true;
     bool vsync = false;
+    bool tripleBuffer = false;
     bool forceSM2 = false;
     bool forceFallback = false;
     bool shadows = true;
@@ -137,6 +138,10 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
                     vsync = true;
                     break;
                     
+                case 't':
+                    tripleBuffer = true;
+                    break;
+                    
                 case 'f':
                     fullscreen = true;
                     break;
@@ -187,7 +192,7 @@ bool Engine::Initialize(const String& windowTitle, const String& logName, const 
         graphics->SetForceSM2(forceSM2);
         graphics->SetForceGBufferFallback(forceFallback);
         graphics->SetWindowTitle(windowTitle);
-        if (!graphics->SetMode(width, height, fullscreen, vsync))
+        if (!graphics->SetMode(width, height, fullscreen, vsync, tripleBuffer))
             return false;
         if (!shadows)
             GetSubsystem<Renderer>()->SetDrawShadows(false);

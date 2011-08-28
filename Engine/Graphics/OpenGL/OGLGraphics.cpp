@@ -171,7 +171,7 @@ void Graphics::SetWindowTitle(const String& windowTitle)
         glfwSetWindowTitle(impl_->window_, windowTitle_.CString());
 }
 
-bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
+bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync, bool tripleBuffer)
 {
     PROFILE(SetScreenMode);
     
@@ -251,7 +251,6 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
         // Associate GLFW window with the execution context
         SetWindowContext(impl_->window_, context_);
     }
-
     
     // Set vsync
     glfwSwapInterval(vsync ? 1 : 0);
@@ -274,6 +273,7 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
     glfwGetWindowSize(impl_->window_, &width_, &height_);
     fullscreen_ = fullscreen;
     vsync_ = vsync;
+    tripleBuffer_ = tripleBuffer;
     
     // Reset rendertargets and viewport for the new screen mode
     ResetRenderTargets();
@@ -305,12 +305,12 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
 
 bool Graphics::SetMode(int width, int height)
 {
-    return SetMode(width, height, fullscreen_, vsync_);
+    return SetMode(width, height, fullscreen_, vsync_, tripleBuffer_);
 }
 
 bool Graphics::ToggleFullscreen()
 {
-    return SetMode(width_, height_, !fullscreen_, vsync_);
+    return SetMode(width_, height_, !fullscreen_, vsync_, tripleBuffer_);
 }
 
 void Graphics::Close()

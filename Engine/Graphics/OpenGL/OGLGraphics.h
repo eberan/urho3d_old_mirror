@@ -63,7 +63,7 @@ public:
     /// Set window title.
     void SetWindowTitle(const String& windowTitle);
     /// Set screen mode.
-    bool SetMode(int width, int height, bool fullscreen, bool vsync);
+    bool SetMode(int width, int height, bool fullscreen, bool vsync, bool tripleBuffer);
     /// Set screen resolution only.
     bool SetMode(int width, int height);
     /// Toggle between full screen and windowed mode.
@@ -213,6 +213,8 @@ public:
     bool GetFullscreen() const { return fullscreen_; }
     /// Return whether vertical sync is on.
     bool GetVSync() const { return vsync_; }
+    /// Return whether triple buffering is on.
+    bool GetTripleBuffer() const { return tripleBuffer_; }
     /// Return whether GPU command queue is flushed at the end of each frame.
     bool GetFlushGPU() const { return flushGPU_; }
     /// Return whether device is lost, and can not yet render. Always false on OpenGL.
@@ -374,6 +376,8 @@ private:
     bool fullscreen_;
     /// Vertical sync flag.
     bool vsync_;
+	/// Triple buffering flag.
+	bool tripleBuffer_;
     /// Flush GPU command queue flag.
     bool flushGPU_;
     /// Texture render target support flag.

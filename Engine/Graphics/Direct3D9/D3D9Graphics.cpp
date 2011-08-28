@@ -160,6 +160,7 @@ Graphics::Graphics(Context* context) :
     windowPosY_(0),
     fullscreen_(false),
     vsync_(false),
+    tripleBuffer_(false),
     flushGPU_(true),
     deviceLost_(false),
     systemDepthStencil_(false),
@@ -238,7 +239,7 @@ void Graphics::SetWindowTitle(const String& windowTitle)
         SetWindowText(impl_->window_, windowTitle_.CString());
 }
 
-bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
+bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync, bool tripleBuffer)
 {
     PROFILE(SetScreenMode);
     
@@ -261,7 +262,8 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
         }
     }
     
-    if (width == width_ && height == height_ && fullscreen == fullscreen_ && vsync == vsync_)
+    // Return if all parameters stayed the same
+    if (width == width_ && height == height_ && fullscreen == fullscreen_ && vsync == vsync_ && tripleBuffer == tripleBuffer_)
         return true;
     
     if (!impl_->window_)
@@ -319,7 +321,7 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
     
     impl_->presentParams_.BackBufferWidth            = width;
     impl_->presentParams_.BackBufferHeight           = height;
-    impl_->presentParams_.BackBufferCount            = 1;
+    impl_->presentParams_.BackBufferCount            = tripleBuffer ? 2 : 1;
     impl_->presentParams_.MultiSampleType            = D3DMULTISAMPLE_NONE;
     impl_->presentParams_.MultiSampleQuality         = 0;
     impl_->presentParams_.SwapEffect                 = D3DSWAPEFFECT_DISCARD;
@@ -338,6 +340,7 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
     height_ = height;
     fullscreen_ = fullscreen;
     vsync_ = vsync;
+    tripleBuffer_ = tripleBuffer;
     
     if (!impl_->device_)
     {
@@ -381,12 +384,12 @@ bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
 
 bool Graphics::SetMode(int width, int height)
 {
-    return SetMode(width, height, fullscreen_, vsync_);
+    return SetMode(width, height, fullscreen_, vsync_, tripleBuffer_);
 }
 
 bool Graphics::ToggleFullscreen()
 {
-    return SetMode(width_, height_, !fullscreen_, vsync_);
+    return SetMode(width_, height_, !fullscreen_, vsync_, tripleBuffer_);
 }
 
 void Graphics::Close()
@@ -509,13 +512,6 @@ bool Graphics::BeginFrame()
     
     impl_->device_->BeginScene();
     
-    // If a GPU flush query is in progress, wait for it to finish
-    if (queryIssued_[queryIndex_])
-    {
-        while (impl_->frameQueries_[queryIndex_]->GetData(0, 0, D3DGETDATA_FLUSH) == S_FALSE);
-        queryIssued_[queryIndex_] = false;
-    }
-    
     // Set default rendertarget and depth buffer
     ResetRenderTargets();
     viewTexture_ = 0;
@@ -548,7 +544,9 @@ void Graphics::EndFrame()
     
     SendEvent(E_ENDRENDERING);
     
-    // Issue a new query now if necessary
+    impl_->device_->EndScene();
+    
+    // Issue a new GPU flush query now if necessary
     if (flushGPU_ && impl_->frameQueries_[queryIndex_])
     {
         impl_->frameQueries_[queryIndex_]->Issue(D3DISSUE_END);
@@ -559,8 +557,14 @@ void Graphics::EndFrame()
             queryIndex_ = 0;
     }
     
-    impl_->device_->EndScene();
     impl_->device_->Present(0, 0, 0, 0);
+    
+    // If a previous GPU flush query is in progress, wait for it to finish
+    if (queryIssued_[queryIndex_])
+    {
+        while (impl_->frameQueries_[queryIndex_]->GetData(0, 0, D3DGETDATA_FLUSH) == S_FALSE);
+        queryIssued_[queryIndex_] = false;
+    }
 }
 
 void Graphics::Clear(unsigned flags, const Color& color, float depth, unsigned stencil)
