@@ -174,7 +174,12 @@ static const unsigned short spotLightIndexData[] =
 static const String hwVariations[] =
 {
     "",
+    // On OpenGL, there is no separate hardware depth path, as it is always supported
+    #ifdef USE_OPENGL
+    ""
+    #else
     "HW"
+    #endif
 };
 
 static const String fallbackVariations[] =
@@ -225,14 +230,6 @@ static const String lightPSVariations[] =
     "OrthoPointSpec",
     "OrthoPointMask",
     "OrthoPointMaskSpec",
-    "HWDir",
-    "HWDirSpec",
-    "HWSpot",
-    "HWSpotSpec",
-    "HWPoint",
-    "HWPointSpec",
-    "HWPointMask",
-    "HWPointMaskSpec",
     "DirShadow",
     "DirShadowSpec",
     "SpotShadow",
@@ -248,15 +245,7 @@ static const String lightPSVariations[] =
     "OrthoPointShadow",
     "OrthoPointShadowSpec",
     "OrthoPointMaskShadow",
-    "OrthoPointMaskShadowSpec",
-    "HWDirShadow",
-    "HWDirShadowSpec",
-    "HWSpotShadow",
-    "HWSpotShadowSpec",
-    "HWPointShadow",
-    "HWPointShadowSpec",
-    "HWPointMaskShadow",
-    "HWPointMaskShadowSpec"
+    "OrthoPointMaskShadowSpec"
 };
 
 static const unsigned INSTANCING_BUFFER_MASK = MASK_INSTANCEMATRIX1 | MASK_INSTANCEMATRIX2 | MASK_INSTANCEMATRIX3;
@@ -953,8 +942,6 @@ void Renderer::SetLightVolumeShaders(Batch& batch)
         vsi += DLVS_ORTHO;
         psi += DLPS_ORTHO;
     }
-    else if (graphics_->GetHardwareDepthSupport())
-        psi += DLPS_HW;
     
     batch.material_ = 0;
     batch.pass_ = 0;
@@ -979,10 +966,14 @@ void Renderer::LoadShaders()
     lightVS_.Clear();
     lightPS_.Clear();
     lightVS_.Resize(MAX_DEFERRED_LIGHT_VS_VARIATIONS);
+    #ifdef USE_OPENGL
+    lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
+    #else
     if (!fallback)
         lightPS_.Resize(MAX_DEFERRED_LIGHT_PS_VARIATIONS);
     else
-        lightPS_.Resize(DLPS_HW); // In fallback mode there is no reconstructed depth and no shadows
+        lightPS_.Resize(DLPS_SHADOW); // In fallback mode there are no shadows
+    #endif
     
     unsigned hwShadows = graphics_->GetHardwareShadowSupport() ? 1 : 0;
     

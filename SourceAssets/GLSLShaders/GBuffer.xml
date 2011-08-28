@@ -5,9 +5,8 @@
         <variation name="Skinned" define="SKINNED" />
     </shader>
     <shader name="GBuffer" type="ps">
-        <option name="Diff" define="DIFFMAP" />
         <option name="Normal" define="NORMALMAP" />
-        <option name="Spec" define="SPECMAP" />      
+        <option name="Spec" define="SPECMAP" />
         <option name="Mask" define="ALPHAMASK" include="Diff" />
     </shader>
 </shaders>

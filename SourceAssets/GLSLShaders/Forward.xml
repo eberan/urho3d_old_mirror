@@ -1,12 +1,8 @@
 <shaders>
     <shader name="Forward" type="vs">
         <option name="Normal" define="NORMALMAP" />
-        <option name="VCol" define="VERTEXCOLOR">
-            <exclude name="Normal" />
-            <exclude name="Shadow" />
-        </option>
+        <option name="VCol" define="VERTEXCOLOR" />
         <option name="Spot" define="SPOTLIGHT" />
-        <option name="Shadow" define="SHADOW" />
         <variation name="" />
         <variation name="Skinned" define="SKINNED" />
         <variation name="Billboard" define="BILLBOARD">
@@ -22,7 +18,6 @@
             <exclude name="Additive" />
             <exclude name="Ambient" />
             <exclude name="Normal" />
-            <exclude name="Shadow" />
             <exclude name="SpecMap" />
             <exclude name="Unlit" />
         </option>
@@ -54,7 +49,6 @@
             <define name="LIGHT" />
         </variation>
         <option name="Mask" define="CUBEMASK" require="POINTLIGHT" />
-        <option name="Shadow" define="SHADOW" require="LIGHT" />
         <option name="Spec" define="SPECULAR" />
     </shader>
 </shaders>

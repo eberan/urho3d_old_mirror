@@ -54,34 +54,6 @@
 
 #include <stdio.h>
 
-#ifdef _MSC_VER
-#include <float.h>
-#else
-// From http://stereopsis.com/FPU.html
-
-#define FPU_CW_PREC_MASK        0x0300
-#define FPU_CW_PREC_SINGLE      0x0000
-#define FPU_CW_PREC_DOUBLE      0x0200
-#define FPU_CW_PREC_EXTENDED    0x0300
-#define FPU_CW_ROUND_MASK       0x0c00
-#define FPU_CW_ROUND_NEAR       0x0000
-#define FPU_CW_ROUND_DOWN       0x0400
-#define FPU_CW_ROUND_UP         0x0800
-#define FPU_CW_ROUND_CHOP       0x0c00
-
-inline unsigned GetFPUState()
-{
-    unsigned control = 0;
-    __asm__ __volatile__ ("fnstcw %0" : "=m" (control));
-    return control;
-}
-
-inline void SetFPUState(unsigned control)
-{
-    __asm__ __volatile__ ("fldcw %0" : : "m" (control));
-}
-#endif
-
 #include "DebugNew.h"
 
 static const unsigned glCmpFunc[] =
@@ -149,10 +121,8 @@ OBJECTTYPESTATIC(Graphics);
 Graphics::Graphics(Context* context_) :
     Object(context_),
     impl_(new GraphicsImpl()),
-    mode_(RENDER_FORWARD),
     width_(0),
     height_(0),
-    multiSample_(1),
     fullscreen_(false),
     vsync_(false),
     flushGPU_(true),
@@ -201,19 +171,16 @@ void Graphics::SetWindowTitle(const String& windowTitle)
         glfwSetWindowTitle(impl_->window_, windowTitle_.CString());
 }
 
-bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, bool vsync, int multiSample)
+bool Graphics::SetMode(int width, int height, bool fullscreen, bool vsync)
 {
     PROFILE(SetScreenMode);
     
-    multiSample = Clamp(multiSample, 1, 16);
-    
-    if (IsInitialized() && mode == mode_ && width == width_ && height == height_ && fullscreen == fullscreen_ &&
-        vsync == vsync_ && multiSample == multiSample_)
+    if (IsInitialized() && width == width_ && height == height_ && fullscreen == fullscreen_ &&
+        vsync == vsync_)
         return true;
     
     // If only vsync changes, do not destroy/recreate the context
-    if (IsInitialized() && mode == mode_ && width == width_ && height == height_ && fullscreen == fullscreen_ &&
-        multiSample == multiSample_ && vsync != vsync_)
+    if (IsInitialized() && width == width_ && height == height_ && fullscreen == fullscreen_ && vsync != vsync_)
     {
         glfwSwapInterval(vsync ? 1 : 0);
         vsync_ = vsync;
@@ -251,10 +218,7 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
         glfwOpenWindowHint(GLFW_DEPTH_BITS, 24);
         glfwOpenWindowHint(GLFW_STENCIL_BITS, 8);
         glfwOpenWindowHint(GLFW_WINDOW_NO_RESIZE, GL_TRUE);
-        if (multiSample > 1 && mode == RENDER_FORWARD)
-            glfwOpenWindowHint(GLFW_FSAA_SAMPLES, multiSample);
-        else
-            glfwOpenWindowHint(GLFW_FSAA_SAMPLES, 0);
+        glfwOpenWindowHint(GLFW_FSAA_SAMPLES, 0);
         
         impl_->window_ = glfwOpenWindow(width, height, fullscreen ? GLFW_FULLSCREEN : GLFW_WINDOWED, windowTitle_.CString(), 0);
         if (!impl_->window_)
@@ -274,19 +238,15 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
             return false;
         }
         
+        if (!_GLEE_EXT_framebuffer_object || !_GLEE_EXT_packed_depth_stencil)
+        {
+            LOGERROR("EXT_framebuffer_object and EXT_packed_depth_stencil OpenGL extensions are required");
+            glfwCloseWindow(impl_->window_);
+            return false;
+        }
+        
         // Set window close callback
         glfwSetWindowCloseCallback(CloseCallback);
-        
-        // Mimic Direct3D way of setting FPU into round-to-nearest, single precision mode
-        // This is actually needed for ODE to behave predictably in float mode
-        #ifdef _MSC_VER
-        _controlfp(_RC_NEAR | _PC_24, _MCW_RC | _MCW_PC);
-        #else
-        unsigned control = GetFPUState();
-        control &= ~(FPU_CW_PREC_MASK | FPU_CW_ROUND_MASK);
-        control |= (FPU_CW_PREC_SINGLE | FPU_CW_ROUND_NEAR);
-        SetFPUState(control);
-        #endif
         
         // Associate GLFW window with the execution context
         SetWindowContext(impl_->window_, context_);
@@ -300,17 +260,11 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
     glGetIntegerv(GL_DEPTH_BITS, &impl_->windowDepthBits_);
     impl_->depthBits_ = impl_->windowDepthBits_;
     
-    // Create the FBO if fully supported
-    if (_GLEE_EXT_framebuffer_object && _GLEE_EXT_packed_depth_stencil)
-    {
-        glGenFramebuffersEXT(1, &impl_->fbo_);
-        
-        // Shadows, render targets and deferred rendering all depend on FBO & packed depth stencil
-        shadowMapFormat_ = GL_DEPTH_COMPONENT16;
-        hiresShadowMapFormat_ = GL_DEPTH_COMPONENT24;
-        renderTargetSupport_ = true;
-        deferredSupport_ = true;
-    }
+    // Create the FBO
+    glGenFramebuffersEXT(1, &impl_->fbo_);
+    
+    shadowMapFormat_ = GL_DEPTH_COMPONENT16;
+    hiresShadowMapFormat_ = GL_DEPTH_COMPONENT24;
     
     // Set initial state to match Direct3D
     glEnable(GL_DEPTH_TEST);
@@ -320,8 +274,6 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
     glfwGetWindowSize(impl_->window_, &width_, &height_);
     fullscreen_ = fullscreen;
     vsync_ = vsync;
-    mode_ = mode;
-    multiSample_ = multiSample;
     
     // Reset rendertargets and viewport for the new screen mode
     ResetRenderTargets();
@@ -338,11 +290,7 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
     for (Vector<GPUObject*>::Iterator i = gpuObjects_.Begin(); i != gpuObjects_.End(); ++i)
         (*i)->OnDeviceReset();
     
-    if (multiSample > 1)
-        LOGINFO("Set screen mode " + String(width_) + "x" + String(height_) + " " + (fullscreen_ ? "fullscreen" : "windowed") +
-        " multisample " + String(multiSample));
-    else
-        LOGINFO("Set screen mode " + String(width_) + "x" + String(height_) + " " + (fullscreen_ ? "fullscreen" : "windowed"));
+    LOGINFO("Set screen mode " + String(width_) + "x" + String(height_) + " " + (fullscreen_ ? "fullscreen" : "windowed"));
     
     using namespace ScreenMode;
     
@@ -357,17 +305,12 @@ bool Graphics::SetMode(RenderMode mode, int width, int height, bool fullscreen, 
 
 bool Graphics::SetMode(int width, int height)
 {
-    return SetMode(mode_, width, height, fullscreen_, vsync_, multiSample_);
-}
-
-bool Graphics::SetMode(RenderMode mode)
-{
-    return SetMode(mode, width_, height_, fullscreen_, vsync_, multiSample_);
+    return SetMode(width, height, fullscreen_, vsync_);
 }
 
 bool Graphics::ToggleFullscreen()
 {
-    return SetMode(mode_, width_, height_, !fullscreen_, vsync_, multiSample_);
+    return SetMode(width_, height_, !fullscreen_, vsync_);
 }
 
 void Graphics::Close()
@@ -573,7 +516,6 @@ bool Graphics::SetVertexBuffers(const Vector<VertexBuffer*>& buffers, const PODV
         
         if (i < buffers.Size())
         {
-
             buffer = buffers[i];
             elementMask = elementMasks[i];
             if (elementMask == MASK_DEFAULT && buffer)
@@ -581,9 +523,6 @@ bool Graphics::SetVertexBuffers(const Vector<VertexBuffer*>& buffers, const PODV
         }
         
         // If buffer and element mask have stayed the same, skip to the next buffer
-
-
-
         if (buffer == vertexBuffers_[i] && elementMask == elementMasks_[i])
             continue;
         
@@ -1856,6 +1795,10 @@ void Graphics::SetForceSM2(bool enable)
 {
 }
 
+void Graphics::SetForceGBufferFallback(bool enable)
+{
+}
+
 bool Graphics::IsInitialized() const
 {
     return impl_->window_ != 0;
@@ -1904,16 +1847,6 @@ PODVector<IntVector2> Graphics::GetResolutions() const
         if (unique)
             ret.Push(IntVector2(width, height));
     }
-    
-    return ret;
-}
-
-PODVector<int> Graphics::GetMultiSampleLevels() const
-{
-    PODVector<int> ret;
-    // No multisampling always supported
-    ret.Push(1);
-    /// \todo Implement properly, if possible
     
     return ret;
 }
@@ -2024,44 +1957,22 @@ unsigned Graphics::GetDepthStencilFormat()
 
 void Graphics::CreateRenderTargets()
 {
-    if (mode_ != RENDER_FORWARD)
+    if (!lightBuffer_)
     {
-        if (!diffBuffer_)
-        {
-            diffBuffer_ = new Texture2D(context_);
-            diffBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
-        }
-        
-        if (!normalBuffer_)
-        {
-            normalBuffer_ = new Texture2D(context_);
-            normalBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
-        }
-        
-        if (!depthBuffer_)
-        {
-            depthBuffer_ = new Texture2D(context_);
-            depthBuffer_->SetSize(0, 0, GetDepthFormat(), TEXTURE_DEPTHSTENCIL);
-        }
-        
-        // If deferred antialiasing is used, reserve screen buffer
-        // (later we will probably want the screen buffer reserved in any case, to do for example distortion effects,
-        // which will also be useful in forward rendering)
-        if (multiSample_ > 1)
-        {
-            screenBuffer_ = new Texture2D(context_);
-            screenBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
-            screenBuffer_->SetFilterMode(FILTER_BILINEAR);
-        }
-        else
-            screenBuffer_.Reset();
+        lightBuffer_ = new Texture2D(context_);
+        lightBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
     }
-    else
+    
+    if (!normalBuffer_)
     {
-        diffBuffer_.Reset();
-        normalBuffer_.Reset();
-        depthBuffer_.Reset();
-        screenBuffer_.Reset();
+        normalBuffer_ = new Texture2D(context_);
+        normalBuffer_->SetSize(0, 0, GetRGBAFormat(), TEXTURE_RENDERTARGET);
+    }
+    
+    if (!depthBuffer_)
+    {
+        depthBuffer_ = new Texture2D(context_);
+        depthBuffer_->SetSize(0, 0, GetDepthFormat(), TEXTURE_DEPTHSTENCIL);
     }
 }
 
@@ -2154,10 +2065,9 @@ void Graphics::Release()
     if (!impl_->window_)
         return;
     
-    diffBuffer_.Reset();
+    lightBuffer_.Reset();
     normalBuffer_.Reset();
     depthBuffer_.Reset();
-    screenBuffer_.Reset();
     depthTextures_.Clear();
     
     // If GPU objects exist ie. it's a context delete/recreate, not Close(), tell them to save and release themselves
@@ -2198,7 +2108,7 @@ void Graphics::SetTextureUnitMappings()
     textureUnits_["LightSpotMap"] = TU_LIGHTSPOT;
     textureUnits_["LightCubeMap"]  = TU_LIGHTSPOT;
     textureUnits_["ShadowMap"] = TU_SHADOWMAP;
-    textureUnits_["DiffBuffer"] = TU_DIFFBUFFER;
+    textureUnits_["LightBuffer"] = TU_LIGHTBUFFER;
     textureUnits_["NormalBuffer"] = TU_NORMALBUFFER;
     textureUnits_["DepthBuffer"] = TU_DEPTHBUFFER;
 }

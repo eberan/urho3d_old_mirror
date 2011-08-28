@@ -1,5 +1,5 @@
 <technique>
     <pass name="gbuffer" vs="GBuffer" ps="GBuffer" />
-    <pass name="base" vs="Material" ps="Material" depthtest="equal" depthwrite="false" />
+    <pass name="base" vs="Material" ps="Material" depthwrite="false" />
     <pass name="shadow" vs="Shadow" ps="Shadow" />
 </technique>

@@ -12,15 +12,10 @@ varying vec3 vBitangent;
 
 void main()
 {
-    #ifdef DIFFMAP
-        vec4 diffInput = texture2D(sDiffMap, vTexCoord);
-        vec3 diffColor = cMatDiffColor.rgb * diffInput.rgb;
-        #ifdef ALPHAMASK
-            if (diffInput.a < 0.5)
-                discard;
-        #endif
-    #else
-        vec3 diffColor = cMatDiffColor.rgb;
+    #ifdef ALPHAMASK
+        vec4 diffInput = texture2D(sDiffMap, iTexCoord);
+        if (diffInput.a < 0.5)
+            discard;
     #endif
 
     #ifdef NORMALMAP
@@ -37,7 +32,5 @@ void main()
     #endif
     float specPower = cMatSpecProperties.y / 255.0;
 
-    // Take fogging into account here so that deferred lights do not need to calculate it
-    gl_FragData[0] = GetReverseFogFactor(vDepth) * vec4(diffColor, specStrength);
-    gl_FragData[1] = vec4(normal * 0.5 + 0.5, specPower);
+    gl_FragColor = vec4(normal * 0.5 + 0.5, specPower);
 }

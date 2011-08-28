@@ -58,7 +58,7 @@ void PS(float2 iTexCoord : TEXCOORD0,
     // Lights are accumulated at half intensity. Bring back to full intensity now
     float4 lightInput = 2.0 * tex2Dproj(sLightBuffer, iScreenPos);
     float3 lightDiffColor = cAmbientColor + lightInput.rgb;
-    // Remove ambient color from the specular color to not get overbright highlights.
+    // Remove ambient color from the specular color to not get overbright highlights
     float3 lightSpecColor = lightInput.a * saturate(lightInput.rgb - cAmbientColor);
 
     float3 finalColor = lightInput.rgb * diffColor + lightSpecColor * specIntensity;

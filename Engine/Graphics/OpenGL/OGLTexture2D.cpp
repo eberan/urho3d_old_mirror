@@ -149,9 +149,6 @@ bool Texture2D::SetSize(int width, int height, unsigned format, TextureUsage usa
     
     if (usage >= TEXTURE_RENDERTARGET)
     {
-        if (!graphics_->GetRenderTargetSupport())
-            return false;
-        
         renderSurface_ = new RenderSurface(this, GL_TEXTURE_2D);
         dynamic_ = true;
         
@@ -389,7 +386,7 @@ bool Texture2D::Create()
         return false;
     
     // If we create a depth stencil texture with packed format, create a renderbuffer instead of an actual texture
-    // This is because packed depth textures have performance problems with ATI display adapters
+    // This is because packed depth textures have performance problems with ATI GPUs
     if (format_ == Graphics::GetDepthStencilFormat())
     {
         if (renderSurface_)
