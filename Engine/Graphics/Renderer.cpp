@@ -983,7 +983,12 @@ void Renderer::LoadShaders()
     
     for (unsigned i = 0; i < lightPS_.Size(); ++i)
     {
-        String linearDepth = linearVariations[!graphics_->GetHardwareDepthSupport() && (i % DLPS_SHADOW) < DLPS_ORTHO ? 1 : 0];
+        // Specular variations do not exist for fallback shaders, so skip
+        if (fallback_ && i & DLPS_SPEC)
+            continue;
+        
+        String linearDepth = linearVariations[!fallback_ && !graphics_->GetHardwareDepthSupport() && (i % DLPS_SHADOW)
+            < DLPS_ORTHO ? 1 : 0];
         if (i >= DLPS_SHADOW)
             lightPS_[i] = GetPixelShader("Light_" + linearDepth + lightPSVariations[i] + hwVariations[hwShadows]);
         else
